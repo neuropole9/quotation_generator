@@ -3702,6 +3702,10 @@ export default function QuotationBuilder({
 
           }
 
+  columns={
+    currentData.columns
+  }
+
           onClose={() => {
 
             setShowPdfImport(
@@ -6549,6 +6553,10 @@ export default function QuotationBuilder({
           showPdfImport
 
         }
+
+  columns={
+    currentData.columns
+  }
 
         onClose={() => {
 

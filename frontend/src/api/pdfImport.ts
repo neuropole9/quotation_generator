@@ -6,6 +6,7 @@ export interface ImportedPdfProduct {
   unit: string;
   quantity: number;
   unitPrice: number;
+  extraValues: Record<string, string | number>;
 }
 
 /*
@@ -24,6 +25,7 @@ export interface PdfImportMeta {
   tablesFound: number;
   productTablesFound?: number;
   pagesWithText: number;
+  extraHeaders?: string[];
 }
 
 export interface PdfImportResponse {
@@ -33,6 +35,33 @@ export interface PdfImportResponse {
   warnings: string[];
   meta: PdfImportMeta;
 }
+
+const normalizeExtraValues = (
+  value: unknown,
+): Record<string, string | number> => {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value)
+  ) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(
+      value as Record<string, unknown>,
+    ).map(
+      ([key, rawValue]) => [
+        String(key).trim(),
+        typeof rawValue === "number"
+          ? rawValue
+          : String(
+              rawValue ?? "",
+            ).trim(),
+      ],
+    ),
+  );
+};
 
 const normalizeProduct = (
   product: any,
@@ -74,6 +103,12 @@ const normalizeProduct = (
         0,
     ) ||
     0,
+
+  extraValues:
+    normalizeExtraValues(
+      product?.extraValues ??
+        product?.extra_values,
+    ),
 });
 
 export async function importQuotationPdf(
@@ -214,6 +249,21 @@ export async function importQuotationPdf(
             ?.pagesWithText ??
             0,
         ) || 0,
+
+      extraHeaders:
+        Array.isArray(
+          payload?.meta
+            ?.extraHeaders,
+        )
+          ? payload.meta.extraHeaders
+              .map(
+                (header: unknown) =>
+                  String(
+                    header ?? "",
+                  ).trim(),
+              )
+              .filter(Boolean)
+          : [],
     },
   };
 }

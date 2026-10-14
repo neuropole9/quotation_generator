@@ -6,6 +6,7 @@ import {
 
 import type {
   ProductLine,
+  QuotationColumn,
 } from "../types/quotation";
 
 import {
@@ -20,6 +21,7 @@ type ImportMode =
 
 interface Props {
   open: boolean;
+  columns: QuotationColumn[];
   onClose: () => void;
   onImport: (
     products: ProductLine[],
@@ -38,8 +40,133 @@ const money = (
     },
   );
 
+const normalizeColumnLabel = (
+  value: string,
+) =>
+  String(
+    value ?? "",
+  )
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[\s._:/\\-]+/g, "");
+
+const importedNumber = (
+  value: string | number,
+) => {
+  if (
+    typeof value === "number" &&
+    Number.isFinite(value)
+  ) {
+    return value;
+  }
+
+  const cleaned =
+    String(
+      value ?? "",
+    )
+      .replace(/,/g, "")
+      .replace(
+        /[^0-9.\-]/g,
+        "",
+      );
+
+  if (
+    !cleaned ||
+    cleaned === "-" ||
+    cleaned === "." ||
+    cleaned === "-."
+  ) {
+    return 0;
+  }
+
+  const parsed =
+    Number(cleaned);
+
+  return Number.isFinite(parsed)
+    ? parsed
+    : 0;
+};
+
+const buildCustomValues = (
+  product: ImportedPdfProduct,
+  columns: QuotationColumn[],
+): Record<string, string | number> => {
+  const importedByHeader =
+    new Map<
+      string,
+      string | number
+    >();
+
+  for (
+    const [
+      header,
+      value,
+    ] of Object.entries(
+      product.extraValues ?? {},
+    )
+  ) {
+    const normalized =
+      normalizeColumnLabel(
+        header,
+      );
+
+    if (normalized) {
+      importedByHeader.set(
+        normalized,
+        value,
+      );
+    }
+  }
+
+  const customValues:
+    Record<
+      string,
+      string | number
+    > = {};
+
+  for (const column of columns) {
+    if (
+      !column.kind.startsWith(
+        "custom",
+      )
+    ) {
+      continue;
+    }
+
+    const importedValue =
+      importedByHeader.get(
+        normalizeColumnLabel(
+          column.label,
+        ),
+      );
+
+    if (
+      importedValue ===
+      undefined
+    ) {
+      continue;
+    }
+
+    customValues[column.id] =
+      column.kind ===
+        "customNumber" ||
+      column.kind ===
+        "customCurrency"
+        ? importedNumber(
+            importedValue,
+          )
+        : String(
+            importedValue ?? "",
+          ).trim();
+  }
+
+  return customValues;
+};
+
 const toProductLine = (
   product: ImportedPdfProduct,
+  columns: QuotationColumn[],
 ): ProductLine => ({
   id: crypto.randomUUID(),
   modelNumber:
@@ -64,7 +191,11 @@ const toProductLine = (
       product.unitPrice || 0,
     ) || 0,
   gstRate: 18,
-  customValues: {},
+  customValues:
+    buildCustomValues(
+      product,
+      columns,
+    ),
 });
 
 const isFalseNoProductsWarning = (
@@ -82,6 +213,7 @@ const isFalseNoProductsWarning = (
 
 export default function PdfImportModal({
   open,
+  columns,
   onClose,
   onImport,
 }: Props) {
@@ -257,7 +389,13 @@ export default function PdfImportModal({
     }
 
     onImport(
-      products.map(toProductLine),
+      products.map(
+        (product) =>
+          toProductLine(
+            product,
+            columns,
+          ),
+      ),
       mode,
     );
 
@@ -288,7 +426,10 @@ export default function PdfImportModal({
               Upload a BOQ or quotation PDF.
               Model number, product description,
               quantity, unit and price will be
-              extracted when available.
+              extracted when available. Extra PDF
+              columns are imported automatically
+              when their header matches a custom
+              frontend column.
             </p>
           </div>
 
@@ -375,6 +516,15 @@ export default function PdfImportModal({
                   </strong>
                 </div>
               </div>
+
+              {meta?.extraHeaders?.length ? (
+                <div className="pdf-import-warning">
+                  Extra PDF columns detected:{" "}
+                  {meta.extraHeaders.join(", ")}.
+                  Matching custom frontend columns
+                  will be populated automatically.
+                </div>
+              ) : null}
 
               <div className="pdf-import-table-wrap">
                 <table className="pdf-import-table pdf-import-table--model">

@@ -55,6 +55,13 @@ TOTAL_HEADERS = {
     "linetotal",
 }
 
+GST_HEADERS = {
+    "gst",
+    "gstrate",
+    "tax",
+    "taxrate",
+}
+
 SERIAL_HEADERS = {
     "sno",
     "slno",
@@ -152,6 +159,55 @@ def _column_map(header_row: list[Any]) -> dict[str, int | None]:
     }
 
 
+def _extra_column_map(
+    header_row: list[Any],
+) -> list[tuple[str, str, int]]:
+    """
+    Return non-standard PDF columns as:
+    (display_header, normalized_header, column_index).
+
+    The frontend uses these values to populate matching
+    user-created columns such as Brand, Warranty, CCT,
+    Wattage, Finish, etc.
+    """
+    standard_headers = (
+        MODEL_HEADERS
+        | DESCRIPTION_HEADERS
+        | UNIT_HEADERS
+        | QUANTITY_HEADERS
+        | PRICE_HEADERS
+        | TOTAL_HEADERS
+        | SERIAL_HEADERS
+        | GST_HEADERS
+    )
+
+    result: list[tuple[str, str, int]] = []
+    seen: set[str] = set()
+
+    for index, raw_header in enumerate(header_row):
+        display_header = _clean_cell(raw_header)
+        normalized_header = _header_key(raw_header)
+
+        if (
+            not display_header
+            or not normalized_header
+            or normalized_header in standard_headers
+            or normalized_header in seen
+        ):
+            continue
+
+        seen.add(normalized_header)
+        result.append(
+            (
+                display_header,
+                normalized_header,
+                index,
+            )
+        )
+
+    return result
+
+
 def _cell(row: list[Any], index: int | None) -> str:
     if index is None:
         return ""
@@ -222,6 +278,7 @@ def _is_probable_product_row(
 def _product_from_row(
     row: list[Any],
     columns: dict[str, int | None],
+    extra_columns: list[tuple[str, str, int]] | None = None,
 ) -> dict[str, Any] | None:
     if not _is_probable_product_row(
         row,
@@ -286,12 +343,25 @@ def _product_from_row(
         if total_value > 0:
             unit_price = total_value / quantity
 
+    extra_values: dict[str, str] = {}
+
+    for (
+        display_header,
+        _normalized_header,
+        column_index,
+    ) in extra_columns or []:
+        extra_values[display_header] = _cell(
+            row,
+            column_index,
+        )
+
     return {
         "modelNumber": model_number,
         "description": description,
         "unit": unit or "Nos",
         "quantity": quantity,
         "unitPrice": unit_price,
+        "extraValues": extra_values,
     }
 
 
@@ -328,6 +398,10 @@ def extract_products_from_pdf(
     S.No, Model Number / Model No / Part No / SKU,
     Description, Unit, Qty, Price / Rate, Total / Amount.
 
+    Additional table columns are returned in each product's
+    ``extraValues`` mapping. The frontend matches them to
+    user-created quotation columns by normalized header name.
+
     Missing Model Number is returned as an empty string.
     Missing Price defaults to 0 unless it can be derived
     from Total / Qty.
@@ -341,6 +415,8 @@ def extract_products_from_pdf(
     tables_found = 0
     product_tables_found = 0
     pages_with_text = 0
+    extra_headers: list[str] = []
+    seen_extra_headers: set[str] = set()
 
     with pdfplumber.open(
         io.BytesIO(pdf_bytes)
@@ -395,12 +471,30 @@ def extract_products_from_pdf(
                     header_row
                 )
 
+                extra_columns = _extra_column_map(
+                    header_row
+                )
+
+                for (
+                    display_header,
+                    normalized_header,
+                    _column_index,
+                ) in extra_columns:
+                    if normalized_header not in seen_extra_headers:
+                        seen_extra_headers.add(
+                            normalized_header
+                        )
+                        extra_headers.append(
+                            display_header
+                        )
+
                 for row in table[
                     header_index + 1 :
                 ]:
                     product = _product_from_row(
                         row,
                         columns,
+                        extra_columns,
                     )
 
                     if product is not None:
@@ -419,5 +513,6 @@ def extract_products_from_pdf(
             "tablesFound": tables_found,
             "productTablesFound": product_tables_found,
             "pagesWithText": pages_with_text,
+            "extraHeaders": extra_headers,
         },
     }
