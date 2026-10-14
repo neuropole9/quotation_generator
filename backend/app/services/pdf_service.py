@@ -50,7 +50,7 @@ PAGE_WIDTH, PAGE_HEIGHT = A4
 
 LEFT_MARGIN = 16 * mm
 RIGHT_MARGIN = 16 * mm
-TOP_MARGIN = 13 * mm
+TOP_MARGIN = 8 * mm
 BOTTOM_MARGIN = 24 * mm
 
 CONTENT_WIDTH = (
@@ -296,11 +296,11 @@ def _logo_flowable(
         return None
 
     try:
-        # Larger logo than the previous 34 x 19 mm.
+        # Larger quotation logo.
         return Image(
             image_stream,
-            width=42 * mm,
-            height=24 * mm,
+            width=56 * mm,
+            height=32 * mm,
             kind="proportional",
         )
 
@@ -858,10 +858,10 @@ def _logo_header(
                 ]
             ],
             colWidths=[
-                42 * mm,
+                56 * mm,
             ],
             rowHeights=[
-                24 * mm,
+                32 * mm,
             ],
         )
 
@@ -900,11 +900,11 @@ def _logo_header(
         ],
         colWidths=[
             CONTENT_WIDTH
-            - 46 * mm,
-            46 * mm,
+            - 60 * mm,
+            60 * mm,
         ],
         rowHeights=[
-            26 * mm,
+            32 * mm,
         ],
     )
 
@@ -1554,10 +1554,10 @@ def _detail_header(
                 ]
             ],
             colWidths=[
-                42 * mm
+                56 * mm
             ],
             rowHeights=[
-                24 * mm
+                32 * mm
             ],
         )
 
@@ -1624,8 +1624,8 @@ def _detail_header(
         ],
         colWidths=[
             CONTENT_WIDTH
-            - 46 * mm,
-            46 * mm,
+            - 60 * mm,
+            60 * mm,
         ],
     )
 
@@ -4000,10 +4000,10 @@ def _build_terms_page(
                 ]
             ],
             colWidths=[
-                42 * mm
+                56 * mm
             ],
             rowHeights=[
-                24 * mm
+                32 * mm
             ],
         )
 
@@ -4062,8 +4062,8 @@ def _build_terms_page(
         ],
         colWidths=[
             CONTENT_WIDTH
-            - 46 * mm,
-            46 * mm,
+            - 60 * mm,
+            60 * mm,
         ],
     )
 
@@ -4275,13 +4275,6 @@ def _build_terms_page(
         TableStyle(
             [
                 (
-                    "LINEABOVE",
-                    (0, 0),
-                    (0, 0),
-                    0.7,
-                    BLACK,
-                ),
-                (
                     "LEFTPADDING",
                     (0, 0),
                     (-1, -1),
@@ -4297,7 +4290,7 @@ def _build_terms_page(
                     "TOPPADDING",
                     (0, 0),
                     (-1, -1),
-                    5,
+                    0,
                 ),
                 (
                     "BOTTOMPADDING",
