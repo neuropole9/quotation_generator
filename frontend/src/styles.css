@@ -10325,3 +10325,78 @@ body:has(.builder-layout--form-only)
 .bw-footer-company {
   text-transform: none !important;
 }
+
+/* =========================================================
+   FINAL LOGO POSITION + SIZE OVERRIDE
+   Keep this block at the VERY BOTTOM of styles.css.
+   It intentionally overrides older repeated !important rules.
+========================================================= */
+
+/* Move the logo visually closer to the top of every quotation page. */
+.bw-page-top .bw-logo-area,
+.bw-detail-header .bw-logo-area,
+.bw-terms-header .bw-logo-area {
+  width: 232px !important;
+  height: 100px !important;
+
+  margin-left: auto !important;
+  margin-right: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding: 0 !important;
+
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: flex-end !important;
+
+  transform: translateY(-18px) !important;
+  overflow: visible !important;
+}
+
+/*
+ * Use width as the primary size so the visible logo actually grows.
+ * height:auto prevents the old fixed 92px box from making the image
+ * appear unchanged when the source logo has a wide aspect ratio.
+ */
+.bw-page-top .bw-company-logo,
+.bw-detail-header .bw-company-logo,
+.bw-terms-header .bw-company-logo {
+  display: block !important;
+
+  width: 224px !important;
+  height: auto !important;
+
+  max-width: 224px !important;
+  max-height: 120px !important;
+
+  object-fit: contain !important;
+  object-position: right top !important;
+}
+
+/* Keep the placeholder consistent when no logo has been uploaded. */
+.bw-page-top .bw-logo-placeholder,
+.bw-detail-header .bw-logo-placeholder,
+.bw-terms-header .bw-logo-placeholder {
+  width: 224px !important;
+  height: 112px !important;
+  max-width: 224px !important;
+  max-height: 112px !important;
+}
+
+/* The logo has moved upward, so do not add unnecessary extra top space. */
+.bw-page-top {
+  min-height: 94px !important;
+  margin-bottom: 12px !important;
+}
+
+.bw-detail-header,
+.bw-terms-header {
+  gap: 0 !important;
+}
+
+/* Signature line must remain removed. */
+.bw-authorized-signature-label {
+  border-top: 0 !important;
+  padding-top: 0 !important;
+}
+
