@@ -3796,23 +3796,6 @@ export default function QuotationBuilder({
 
             onClick={
 
-              onBack
-
-            }
-
-          >
-
-            Templates
-
-          </button>
-          <button
-
-            type="button"
-
-            className="secondary-button"
-
-            onClick={
-
               handleLoadSample
 
             }
