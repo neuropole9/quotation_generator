@@ -359,36 +359,26 @@ function DocumentFooter({
   data: QuotationData;
   pageNumber: number;
 }) {
+  // Footer Line 1 / Footer Line 2 are the exact editable
+  // source of truth for both Preview and the downloaded PDF.
+  // Do not fall back to the company fields when either line is cleared.
   const companyName =
     data.company
       .footerLine1
-      ?.trim() ||
-    data.company.name ||
+      ?.trim() ??
     "";
-
-  const fallbackDetails =
-    [
-      data.company.address,
-      data.company.phone,
-      data.company.website,
-      data.company.email,
-    ]
-      .filter(
-        (value) =>
-          Boolean(
-            value?.trim(),
-          ),
-      )
-      .join(" • ");
 
   const companyDetails =
     data.company
       .footerLine2
-      ?.trim() ||
-    fallbackDetails;
+      ?.trim() ??
+    "";
 
   return (
-    <footer className="bw-page-footer">
+    <footer
+      key={`${companyName}::${companyDetails}::${pageNumber}`}
+      className="bw-page-footer"
+    >
       <div className="bw-footer-rule" />
 
       {companyName ? (
@@ -940,17 +930,30 @@ function PartProductTable({
     );
 
   const partLabel =
-    `${getPartLetterLabel(
+    getPartLetterLabel(
       partNumber - 1,
-    )}${
-      continued
-        ? ' — CONTINUED'
-        : ''
-    }`;
+    );
 
-  const partDescription =
+  const basePartDescription =
     description.trim() ||
     `Abstract Row ${partNumber}`;
+
+  const partDescription =
+    continued
+      ? `${basePartDescription} (Continued)`
+      : basePartDescription;
+
+  const partLabelColumnSpan =
+    columnCount >= 3
+      ? 2
+      : 1;
+
+  const partDescriptionColumnSpan =
+    Math.max(
+      1,
+      columnCount -
+        partLabelColumnSpan,
+    );
 
   return (
     <table className="bw-product-table bw-part-product-table">
@@ -974,14 +977,23 @@ function PartProductTable({
       <thead>
         {columnCount > 1 ? (
           <tr className="bw-part-row">
-            <td className="bw-part-row__number">
+            <td
+              className="bw-part-row__number"
+              colSpan={
+                partLabelColumnSpan
+              }
+              style={{
+                whiteSpace:
+                  "nowrap",
+              }}
+            >
               {partLabel}
             </td>
 
             <td
               className="bw-part-row__description"
               colSpan={
-                columnCount - 1
+                partDescriptionColumnSpan
               }
             >
               {partDescription}
@@ -1487,22 +1499,26 @@ function buildGroupedDetailPages({
         abstractItems.length -
           1;
 
+      const base =
+        PART_HEADER_HEIGHT +
+        tableHeaderHeight;
+
+      const finalTotalsReserve =
+        isFinalPart
+          ? DETAIL_GAP +
+            totalsHeight
+          : 0;
+
       if (
         productIndices.length ===
         0
       ) {
         const required =
-          PART_HEADER_HEIGHT +
-          tableHeaderHeight +
+          base +
           PART_EMPTY_ROW_HEIGHT +
           PART_SUBTOTAL_HEIGHT +
           PART_BLOCK_GAP +
-          (
-            isFinalPart
-              ? DETAIL_GAP +
-                totalsHeight
-              : 0
-          );
+          finalTotalsReserve;
 
         if (
           pageUsed[
@@ -1539,6 +1555,94 @@ function buildGroupedDetailPages({
         return;
       }
 
+      /*
+       * First check whether this complete Part is small enough
+       * to fit on one fresh detail page. If yes, treat the Part
+       * as an indivisible block: either place the whole Part in
+       * the remaining space, or move the whole Part to the next
+       * page. This prevents cases such as a 2-row PART C being
+       * split 1 + 1 while a large blank area remains.
+       */
+      const completeRowsHeight =
+        productIndices.reduce(
+          (
+            total,
+            productIndex,
+          ) =>
+            total +
+            (
+              rowHeights[
+                productIndex
+              ] || 44
+            ),
+          0,
+        );
+
+      const completePartHeight =
+        base +
+        completeRowsHeight +
+        PART_SUBTOTAL_HEIGHT +
+        PART_BLOCK_GAP +
+        finalTotalsReserve;
+
+      if (
+        completePartHeight <=
+        pageBudget
+      ) {
+        const current =
+          currentPage();
+
+        if (
+          pageUsed[
+            current
+          ] >
+            0 &&
+          pageUsed[
+            current
+          ] +
+            completePartHeight >
+            pageBudget
+        ) {
+          startNewPage();
+        }
+
+        pages[
+          currentPage()
+        ].segments.push({
+          partId,
+          partIndex,
+          partDescription:
+            abstractItem.description,
+          productIndices:
+            productIndices,
+          serialStart: 0,
+          continued: false,
+          showSubtotal: true,
+          rowHeights:
+            productIndices.map(
+              (
+                productIndex,
+              ) =>
+                rowHeights[
+                  productIndex
+                ] || 44,
+            ),
+        });
+
+        pageUsed[
+          currentPage()
+        ] +=
+          completePartHeight;
+
+        return;
+      }
+
+      /*
+       * Large Parts may genuinely need more than one page.
+       * Split only those Parts, and reserve the subtotal on the
+       * page containing the final row. Final quotation totals
+       * are also kept together as one reserved block.
+       */
       let cursor = 0;
       let continued = false;
 
@@ -1549,11 +1653,7 @@ function buildGroupedDetailPages({
         const pageIndex =
           currentPage();
 
-        const base =
-          PART_HEADER_HEIGHT +
-          tableHeaderHeight;
-
-        let available =
+        const available =
           pageBudget -
           pageUsed[
             pageIndex
@@ -1581,6 +1681,7 @@ function buildGroupedDetailPages({
 
         const selected:
           number[] = [];
+
         const selectedHeights:
           number[] = [];
 
@@ -1609,25 +1710,25 @@ function buildGroupedDetailPages({
             isLastRow
               ? PART_SUBTOTAL_HEIGHT +
                 PART_BLOCK_GAP +
-                (
-                  isFinalPart
-                    ? DETAIL_GAP +
-                      totalsHeight
-                    : 0
-                )
+                finalTotalsReserve
               : 0;
 
-          if (
+          const required =
             base +
-              rowsHeight +
-              rowHeight +
-              reserve <=
+            rowsHeight +
+            rowHeight +
+            reserve;
+
+          if (
+            required <=
               available ||
-            selected.length ===
-              0 &&
+            (
+              selected.length ===
+                0 &&
               pageUsed[
                 currentPage()
               ] === 0
+            )
           ) {
             selected.push(
               productIndex,
@@ -1687,14 +1788,8 @@ function buildGroupedDetailPages({
           (
             completed
               ? PART_SUBTOTAL_HEIGHT +
-                PART_BLOCK_GAP
-              : 0
-          ) +
-          (
-            completed &&
-            isFinalPart
-              ? DETAIL_GAP +
-                totalsHeight
+                PART_BLOCK_GAP +
+                finalTotalsReserve
               : 0
           );
 

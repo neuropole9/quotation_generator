@@ -600,9 +600,9 @@ def _footer_text(
     str,
     str,
 ]:
+    # Footer editor fields are the exact source of truth.
     company_name = (
         data.company.footerLine1
-        or data.company.name
         or ""
     ).strip()
 
@@ -610,25 +610,6 @@ def _footer_text(
         data.company.footerLine2
         or ""
     ).strip()
-
-    if not footer_details:
-        parts = [
-            data.company.address,
-            data.company.phone,
-            data.company.website,
-            data.company.email,
-        ]
-
-        footer_details = (
-            " • ".join(
-                str(value).strip()
-                for value
-                in parts
-                if str(
-                    value or ""
-                ).strip()
-            )
-        )
 
     return (
         company_name,
@@ -643,56 +624,27 @@ def _footer_lines(
     Build compact footer detail lines that always remain
     inside the A4 left/right margins.
     """
-    # Respect a manually supplied footerLine2 first.
     custom = (
         data.company.footerLine2
         or ""
     ).strip()
 
-    if custom:
-        # Split a long custom line at common separators.
-        parts = [
-            part.strip()
-            for part
-            in re.split(
-                r"\s*(?:\||•)\s*",
-                custom,
-            )
-            if part.strip()
-        ]
-    else:
-        parts = [
-            str(value).strip()
-            for value
-            in [
-                data.company.address,
-                data.company.phone,
-                data.company.website,
-                data.company.email,
-            ]
-            if str(
-                value or ""
-            ).strip()
-        ]
+    # Footer Line 2 is used exactly as edited. If it is blank,
+    # the PDF footer details remain blank as well.
+    parts = [
+        part.strip()
+        for part
+        in re.split(
+            r"\s*(?:\||•)\s*",
+            custom,
+        )
+        if part.strip()
+    ]
 
     if not parts:
         return []
 
-    # Prefer:
-    # line 1 -> address
-    # line 2 -> phone / website / email
-    if (
-        not custom
-        and len(parts) > 1
-    ):
-        return [
-            parts[0],
-            " | ".join(
-                parts[1:]
-            ),
-        ]
-
-    # For custom text, balance the segments across at most 2 lines.
+    # Balance the user-entered segments across at most two lines.
     if len(parts) == 1:
         return [
             parts[0]
@@ -760,7 +712,6 @@ def _draw_page_footer(
 
     company_name = (
         data.company.footerLine1
-        or data.company.name
         or ""
     ).strip()
 
@@ -3483,7 +3434,51 @@ def _build_detail_pages(
                 visible_columns
             )
 
-            if column_count > 1:
+            if column_count > 2:
+                part_row = [
+                    Paragraph(
+                        (
+                            "<b>"
+                            f"{safe_text(part_label)}"
+                            "</b>"
+                        ),
+                        ParagraphStyle(
+                            f"part_label_inline_{page_index}_{segment_index}",
+                            parent=body_center,
+                            fontName="Helvetica-Bold",
+                            fontSize=8.5,
+                            leading=10.5,
+                            textColor=BLACK,
+                        ),
+                    ),
+                    "",
+                    Paragraph(
+                        (
+                            "<b>"
+                            f"{safe_text(part_description)}"
+                            "</b>"
+                        ),
+                        ParagraphStyle(
+                            f"part_description_inline_{page_index}_{segment_index}",
+                            parent=body,
+                            fontName="Helvetica-Bold",
+                            fontSize=8.5,
+                            leading=10.5,
+                            textColor=BLACK,
+                        ),
+                    ),
+                ]
+
+                part_row.extend(
+                    [
+                        ""
+                        for _
+                        in range(
+                            column_count - 3
+                        )
+                    ]
+                )
+            elif column_count > 1:
                 part_row = [
                     Paragraph(
                         (
@@ -3516,16 +3511,6 @@ def _build_detail_pages(
                         ),
                     ),
                 ]
-
-                part_row.extend(
-                    [
-                        ""
-                        for _
-                        in range(
-                            column_count - 2
-                        )
-                    ]
-                )
             else:
                 part_row = [
                     Paragraph(
@@ -3791,14 +3776,36 @@ def _build_detail_pages(
                 ),
             ]
 
-            if column_count > 1:
+            if column_count > 2:
                 style_commands.extend(
                     [
                         (
                             "SPAN",
+                            (0, 0),
                             (1, 0),
+                        ),
+                        (
+                            "SPAN",
+                            (2, 0),
                             (-1, 0),
                         ),
+                        (
+                            "ALIGN",
+                            (0, 0),
+                            (1, 0),
+                            "CENTER",
+                        ),
+                        (
+                            "ALIGN",
+                            (2, 0),
+                            (-1, 0),
+                            "LEFT",
+                        ),
+                    ]
+                )
+            elif column_count > 1:
+                style_commands.extend(
+                    [
                         (
                             "ALIGN",
                             (0, 0),
@@ -3808,7 +3815,7 @@ def _build_detail_pages(
                         (
                             "ALIGN",
                             (1, 0),
-                            (-1, 0),
+                            (1, 0),
                             "LEFT",
                         ),
                     ]
