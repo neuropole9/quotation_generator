@@ -1,7 +1,8 @@
 import type { QuotationData } from "../types/quotation";
+import { apiUrl } from "./apiBase";
 
 export async function downloadQuotationPdf(data: QuotationData): Promise<void> {
-  const response = await fetch("/api/quotation/pdf", {
+  const response = await fetch(apiUrl("/api/quotation/pdf"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),

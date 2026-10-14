@@ -18,6 +18,8 @@ import QuotationPreview from "../components/QuotationPreview";
 
 import TermsEditor from "../components/TermsEditor";
 
+import { apiUrl } from "../utils/apiBase";
+
 
 
 import type {
@@ -1365,7 +1367,7 @@ const downloadQuotationPdf =
 
       await fetch(
 
-        "/api/quotation/pdf",
+        apiUrl("/api/quotation/pdf"),
 
         {
 

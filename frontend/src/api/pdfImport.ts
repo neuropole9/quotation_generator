@@ -1,3 +1,5 @@
+import { apiUrl } from "../utils/apiBase";
+
 export interface ImportedPdfProduct {
   modelNumber: string;
   description: string;
@@ -87,7 +89,7 @@ export async function importQuotationPdf(
 
   const response =
     await fetch(
-      "/api/quotation/import-pdf",
+      apiUrl("/api/quotation/import-pdf"),
       {
         method: "POST",
         body: formData,
@@ -99,15 +101,22 @@ export async function importQuotationPdf(
       `PDF import failed (${response.status}).`;
 
     try {
-      const body =
-        await response.json();
+      const errorText =
+        await response.text();
 
-      message =
-        body?.detail ||
-        body?.message ||
-        message;
+      if (errorText.trim()) {
+        const body =
+          JSON.parse(
+            errorText,
+          );
+
+        message =
+          body?.detail ||
+          body?.message ||
+          message;
+      }
     } catch {
-      // Keep fallback message.
+      // Keep the HTTP-status fallback message.
     }
 
     throw new Error(
@@ -115,8 +124,27 @@ export async function importQuotationPdf(
     );
   }
 
-  const payload =
-    await response.json();
+  const responseText =
+    await response.text();
+
+  if (!responseText.trim()) {
+    throw new Error(
+      "The PDF import server returned an empty response. Please try again after the backend is fully awake.",
+    );
+  }
+
+  let payload: any;
+
+  try {
+    payload =
+      JSON.parse(
+        responseText,
+      );
+  } catch {
+    throw new Error(
+      `The PDF import server returned an invalid response (${response.status}).`,
+    );
+  }
 
   const products:
     ImportedPdfProduct[] =
