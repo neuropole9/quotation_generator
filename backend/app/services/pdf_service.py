@@ -48,9 +48,9 @@ WHITE = colors.white
 
 PAGE_WIDTH, PAGE_HEIGHT = A4
 
-LEFT_MARGIN = 16 * mm
-RIGHT_MARGIN = 16 * mm
-TOP_MARGIN = 8 * mm
+LEFT_MARGIN = 7 * mm
+RIGHT_MARGIN = 7 * mm
+TOP_MARGIN = 5 * mm
 BOTTOM_MARGIN = 24 * mm
 
 CONTENT_WIDTH = (
@@ -76,7 +76,7 @@ USABLE_FRAME_HEIGHT = (
     - FRAME_INTERNAL_VERTICAL_PADDING
 )
 
-DETAIL_GAP = 4 * mm
+DETAIL_GAP = 2 * mm
 DETAIL_CONTINUATION_GAP = 2 * mm
 DETAIL_TOTALS_GAP = 5 * mm
 DETAIL_SAFETY = 4 * mm
@@ -904,7 +904,7 @@ def _logo_header(
             60 * mm,
         ],
         rowHeights=[
-            32 * mm,
+            34 * mm,
         ],
     )
 
@@ -939,7 +939,7 @@ def _logo_header(
                     "TOPPADDING",
                     (0, 0),
                     (-1, -1),
-                    0,
+                    2 * mm,
                 ),
                 (
                     "BOTTOMPADDING",
@@ -1666,14 +1666,20 @@ def _detail_header(
                 (
                     "TOPPADDING",
                     (0, 0),
-                    (-1, -1),
+                    (-1, 0),
+                    1.5 * mm,
+                ),
+                (
+                    "TOPPADDING",
+                    (0, 1),
+                    (-1, 1),
                     0,
                 ),
                 (
                     "BOTTOMPADDING",
                     (0, 0),
                     (-1, 0),
-                    2,
+                    0.5 * mm,
                 ),
                 (
                     "BOTTOMPADDING",
@@ -4104,14 +4110,20 @@ def _build_terms_page(
                 (
                     "TOPPADDING",
                     (0, 0),
-                    (-1, -1),
+                    (-1, 0),
+                    1.5 * mm,
+                ),
+                (
+                    "TOPPADDING",
+                    (0, 1),
+                    (-1, 1),
                     0,
                 ),
                 (
                     "BOTTOMPADDING",
                     (0, 0),
                     (-1, 0),
-                    2,
+                    0.5 * mm,
                 ),
                 (
                     "BOTTOMPADDING",

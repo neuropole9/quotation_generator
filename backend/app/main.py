@@ -7,6 +7,11 @@ from app.routes.health import router as health_router
 from app.routes.quotation import router as quotation_router
 from app.routes.templates import router as templates_router
 from app.services.pdf_import_service import extract_products_from_pdf
+from app.routes.health import router as health_router
+from app.routes.quotation import router as quotation_router
+from app.routes.templates import router as templates_router
+from app.routes.admin_users import router as admin_users_router
+from app.services.pdf_import_service import extract_products_from_pdf
 
 
 def _allowed_origins() -> list[str]:
@@ -50,6 +55,7 @@ app.add_middleware(
 app.include_router(health_router, prefix="/api")
 app.include_router(templates_router, prefix="/api")
 app.include_router(quotation_router, prefix="/api")
+app.include_router(admin_users_router, prefix="/api")
 
 
 @app.get("/")

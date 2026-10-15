@@ -14,8 +14,12 @@ backend/.venv/
 # Environment files / secrets
 .env
 .env.*
+*.env
+
+# Allow safe example environment files
 !.env.example
 !frontend/.env.example
+!backend/.env.example
 
 # OS / editor
 .DS_Store

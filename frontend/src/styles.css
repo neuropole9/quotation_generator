@@ -4547,8 +4547,8 @@ input[type="number"] {
   box-sizing: border-box;
 
   padding:
-    48px
-    54px
+    30px
+    38px
     105px;
 
   overflow: hidden;
@@ -10349,7 +10349,7 @@ body:has(.builder-layout--form-only)
   align-items: flex-start !important;
   justify-content: flex-end !important;
 
-  transform: translateY(-18px) !important;
+  transform: translateY(-8px) !important;
   overflow: visible !important;
 }
 
@@ -10385,7 +10385,7 @@ body:has(.builder-layout--form-only)
 
 /* The logo has moved upward, so do not add unnecessary extra top space. */
 .bw-page-top {
-  min-height: 94px !important;
+  min-height: 78px !important;
   margin-bottom: 12px !important;
 }
 
@@ -10398,5 +10398,246 @@ body:has(.builder-layout--form-only)
 .bw-authorized-signature-label {
   border-top: 0 !important;
   padding-top: 0 !important;
+}
+
+/* =========================================================
+   FINAL WIDER QUOTATION TABLES
+   Keep this block at the VERY BOTTOM of styles.css.
+========================================================= */
+
+/*
+ * The quotation tables already use width:100%.
+ * Reducing only the page's horizontal padding gives every
+ * table more usable width without changing the A4 page size.
+ */
+.bw-page {
+  padding-left: 38px !important;
+  padding-right: 38px !important;
+}
+
+/* All principal document tables should use the full content width. */
+.bw-info-table,
+.bw-client-project-table,
+.bw-client-extra-table,
+.bw-quotation-info-table,
+.bw-abstract-table,
+.bw-product-table,
+.bw-detail-totals,
+.bw-part-subtotal,
+.bw-bank-details-table {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* =========================================================
+   FINAL TOP-WHITESPACE + LOGO POSITION OVERRIDE
+   Keep this block at the VERY BOTTOM of styles.css.
+========================================================= */
+
+.bw-page {
+  padding-top: 30px !important;
+}
+
+/* Pull the logo closer to the physical top edge of the A4 preview. */
+.bw-page-top .bw-logo-area,
+.bw-detail-header .bw-logo-area,
+.bw-terms-header .bw-logo-area {
+  transform: translateY(-8px) !important;
+  margin-top: 0 !important;
+}
+
+/* Do not reserve unnecessary blank height after moving the logo upward. */
+.bw-page-top {
+  min-height: 78px !important;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  margin-bottom: 8px !important;
+}
+
+.bw-detail-header,
+.bw-terms-header {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+/* =========================================================
+   FINAL LOGO + HEADING ORDER
+   Keep this block at the VERY BOTTOM of styles.css.
+========================================================= */
+
+/* Move the logo slightly down from the previous -26px position. */
+.bw-page-top .bw-logo-area,
+.bw-detail-header .bw-logo-area,
+.bw-terms-header .bw-logo-area {
+  transform: translateY(-8px) !important;
+}
+
+/*
+ * Product Details and Terms headings must start only after the logo.
+ * Keep the header in a strict vertical stack:
+ * logo -> gap -> heading -> quotation/meta text.
+ */
+.bw-detail-header,
+.bw-terms-header {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+}
+
+.bw-detail-header .bw-logo-area,
+.bw-terms-header .bw-logo-area {
+  order: 1 !important;
+  align-self: flex-end !important;
+  margin: 0 0 2px auto !important;
+}
+
+.bw-detail-title-block,
+.bw-terms-title-block {
+  order: 2 !important;
+  width: 100% !important;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+/* Keep the first-page logo area compact after moving the logo down. */
+.bw-page-top {
+  min-height: 84px !important;
+  margin-bottom: 8px !important;
+}
+
+/* =========================================================
+   FINAL LOGO / HEADING SPACING
+   Keep this block at the VERY BOTTOM of styles.css.
+========================================================= */
+
+/* Logo slightly lower than the previous version. */
+.bw-page-top .bw-logo-area,
+.bw-detail-header .bw-logo-area,
+.bw-terms-header .bw-logo-area {
+  transform: translateY(-8px) !important;
+}
+
+/*
+ * Product Details and Terms:
+ * keep logo first, but do not reserve a 100px-tall blank block
+ * below it. The image may overflow the compact container safely.
+ */
+.bw-detail-header,
+.bw-terms-header {
+  gap: 0 !important;
+}
+
+.bw-detail-header .bw-logo-area,
+.bw-terms-header .bw-logo-area {
+  height: 76px !important;
+  min-height: 76px !important;
+  margin: 0 0 0 auto !important;
+  overflow: visible !important;
+}
+
+/* Pull the heading upward so it follows the visible logo closely. */
+.bw-detail-title-block,
+.bw-terms-title-block {
+  margin-top: -4px !important;
+  padding-top: 0 !important;
+}
+
+/* Remove any extra heading top margin inherited from older rules. */
+.bw-detail-header h1,
+.bw-terms-header h1 {
+  margin-top: 0 !important;
+}
+
+/* First-page logo area stays compact as well. */
+.bw-page-top {
+  min-height: 82px !important;
+}
+
+/* =========================================================
+   FINAL COMPACT PRODUCT/TERMS HEADER
+   Keep this block at the VERY BOTTOM of styles.css.
+========================================================= */
+
+/* Move the logo slightly upward from the previous position. */
+.bw-page-top .bw-logo-area,
+.bw-detail-header .bw-logo-area,
+.bw-terms-header .bw-logo-area {
+  transform: translateY(-12px) !important;
+}
+
+/*
+ * Reduce the vertical area reserved for the logo.
+ * The logo itself remains large and may overflow this compact box.
+ */
+.bw-detail-header .bw-logo-area,
+.bw-terms-header .bw-logo-area {
+  height: 64px !important;
+  min-height: 64px !important;
+  margin: 0 0 0 auto !important;
+  overflow: visible !important;
+}
+
+/* Move the heading upward so it sits closer to the logo. */
+.bw-detail-title-block,
+.bw-terms-title-block {
+  margin-top: -8px !important;
+  padding-top: 0 !important;
+}
+
+/* Reduce space below the heading/header so the tables also move upward. */
+.bw-detail-header,
+.bw-terms-header {
+  gap: 0 !important;
+  margin-bottom: 8px !important;
+}
+
+/* Reduce the extra gap before Product Details tables. */
+.bw-detail-page .bw-product-table {
+  margin-top: 2px !important;
+}
+
+/* Keep the first-page logo slightly higher too. */
+.bw-page-top {
+  min-height: 78px !important;
+}
+
+/* =========================================================
+   FINAL TABLE LEFT-EDGE EXTENSION
+   Keep this block at the VERY BOTTOM of styles.css.
+========================================================= */
+
+/*
+ * Extend quotation content toward the LEFT while preserving
+ * the existing right-side spacing.
+ */
+.bw-page {
+  padding-left: 24px !important;
+  padding-right: 24px !important;
+}
+
+/* Ensure all primary tables consume the newly available width. */
+.bw-info-table,
+.bw-client-project-table,
+.bw-client-extra-table,
+.bw-quotation-info-table,
+.bw-abstract-table,
+.bw-product-table,
+.bw-detail-totals,
+.bw-part-subtotal,
+.bw-bank-details-table {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* =========================================================
+   FINAL EQUAL TABLE SIDE MARGINS
+   Keep this block at the VERY BOTTOM of styles.css.
+========================================================= */
+
+.bw-page {
+  padding-left: 24px !important;
+  padding-right: 24px !important;
 }
 
