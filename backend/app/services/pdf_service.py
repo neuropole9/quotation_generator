@@ -4235,44 +4235,129 @@ def _terms_body_style(
         leading=10.5,
         alignment=TA_LEFT,
         textColor=BLACK,
-        spaceAfter=4,
+        spaceAfter=0,
     )
 
 
-def _term_flowables(
+def _terms_subpoint_style(
+    body: ParagraphStyle,
+) -> ParagraphStyle:
+    return ParagraphStyle(
+        "terms_subpoint",
+        parent=_terms_body_style(
+            body
+        ),
+        leftIndent=11,
+        firstLineIndent=0,
+    )
+
+
+def _split_term_blocks(
     term_text: str,
-    number: int,
+) -> list[str]:
+    blocks = [
+        line.strip()
+        for line
+        in str(
+            term_text
+            or ""
+        ).splitlines()
+        if line.strip()
+    ]
+
+    if blocks:
+        return blocks
+
+    clean = str(
+        term_text
+        or ""
+    ).strip()
+
+    return (
+        [clean]
+        if clean
+        else []
+    )
+
+
+def _term_title(
+    term_text: str,
+    term_number: int,
+) -> str:
+    blocks = (
+        _split_term_blocks(
+            term_text
+        )
+    )
+
+    if not blocks:
+        return (
+            f"Term {term_number}"
+        )
+
+    title = blocks[0]
+
+    # Keep continuation headings compact for unusually long titles.
+    if len(title) > 90:
+        title = (
+            title[:87]
+            .rstrip()
+            + "..."
+        )
+
+    return title
+
+
+def _term_block_flowables(
+    block_text: str,
+    term_number: int,
+    block_index: int,
+    is_last_block: bool,
     body: ParagraphStyle,
 ) -> list:
-    clean_text = (
-        safe_text(
-            term_text,
-            "",
-        )
-        .replace(
-            "\n",
-            "<br/>",
-        )
+    clean_text = safe_text(
+        block_text,
+        "",
     )
 
     if not clean_text:
         return []
 
-    return [
-        Paragraph(
+    if block_index == 0:
+        paragraph = Paragraph(
             (
-                f"<b>{number}.</b> "
+                f"<b>{term_number}.</b> "
                 f"{clean_text}"
             ),
             _terms_body_style(
                 body
             ),
-        ),
+        )
+    else:
+        paragraph = Paragraph(
+            clean_text,
+            _terms_subpoint_style(
+                body
+            ),
+        )
+
+    flowables = [
+        paragraph,
+    ]
+
+    flowables.append(
         Spacer(
             1,
-            1.2 * mm,
-        ),
-    ]
+            (
+                1.2 * mm
+                if is_last_block
+                else 0.45 * mm
+            ),
+        )
+    )
+
+    return flowables
+
 
 
 def _flowable_total_height(
@@ -4314,120 +4399,168 @@ def _flowable_total_height(
     )
 
 
-def _term_height(
-    term_text: str,
-    number: int,
-    body: ParagraphStyle,
+def _flowables_height(
+    flowables: list,
 ) -> float:
     return sum(
         _flowable_total_height(
             flowable
         )
         for flowable
-        in _term_flowables(
-            term_text,
-            number,
-            body,
-        )
+        in flowables
     )
 
 
-def _partition_terms_by_height(
+def _partition_terms_into_blocks(
     terms: list[str],
     body: ParagraphStyle,
     page_budget: float,
-) -> list[
-    tuple[
-        int,
-        list[str],
-    ]
-]:
-    if not terms:
-        return [
-            (
-                0,
-                [],
+) -> list[list[dict[str, Any]]]:
+    """
+    Split Terms & Conditions at explicit line/subpoint boundaries.
+
+    A normal one-line term stays together. A multiline term such as
+    AMC can continue onto the next page, so unused page space is not
+    wasted simply because the complete term is taller than the
+    remaining area.
+    """
+    flat_blocks: list[
+        dict[str, Any]
+    ] = []
+
+    for term_index, term_text in enumerate(
+        terms
+    ):
+        term_number = (
+            term_index + 1
+        )
+
+        blocks = (
+            _split_term_blocks(
+                term_text
             )
-        ]
+        )
+
+        for block_index, block_text in enumerate(
+            blocks
+        ):
+            flat_blocks.append(
+                {
+                    "term_index":
+                        term_index,
+                    "term_number":
+                        term_number,
+                    "block_index":
+                        block_index,
+                    "block_text":
+                        block_text,
+                    "is_last_block":
+                        (
+                            block_index
+                            ==
+                            len(blocks) - 1
+                        ),
+                }
+            )
+
+    if not flat_blocks:
+        return [[]]
 
     pages: list[
-        tuple[
-            int,
-            list[str],
+        list[
+            dict[str, Any]
         ]
     ] = []
 
-    current_terms: list[str] = []
-    current_height = 0.0
-    current_start_index = 0
+    current_page: list[
+        dict[str, Any]
+    ] = []
 
-    for index, term_text in enumerate(
-        terms
-    ):
-        measured_height = max(
-            20.0,
-            _term_height(
-                term_text,
-                index + 1,
+    current_height = 0.0
+
+    for block in flat_blocks:
+        block_flowables = (
+            _term_block_flowables(
+                block[
+                    "block_text"
+                ],
+                block[
+                    "term_number"
+                ],
+                block[
+                    "block_index"
+                ],
+                block[
+                    "is_last_block"
+                ],
                 body,
+            )
+        )
+
+        block_height = max(
+            16.0,
+            _flowables_height(
+                block_flowables
             ),
         )
 
-        should_start_new_page = (
-            bool(
-                current_terms
-            )
+        if (
+            current_page
             and
             current_height
-            + measured_height
+            + block_height
             > page_budget
-        )
-
-        if should_start_new_page:
+        ):
             pages.append(
-                (
-                    current_start_index,
-                    current_terms,
-                )
+                current_page
             )
 
-            current_terms = []
+            current_page = []
             current_height = 0.0
-            current_start_index = index
 
-        current_terms.append(
-            term_text
+        current_page.append(
+            {
+                "kind":
+                    "block",
+                **block,
+            }
         )
 
         current_height += (
-            measured_height
+            block_height
         )
 
-    if current_terms:
+    if current_page:
         pages.append(
-            (
-                current_start_index,
-                current_terms,
-            )
+            current_page
         )
 
     return pages
 
 
-def _append_terms_content(
+
+def _append_terms_page_items(
     story: list,
-    terms: list[str],
-    start_number: int,
+    items: list[
+        dict[str, Any]
+    ],
     body: ParagraphStyle,
 ):
-    for offset, term_text in enumerate(
-        terms
-    ):
+    for item in items:
         story.extend(
-            _term_flowables(
-                term_text,
-                start_number
-                + offset,
+            _term_block_flowables(
+                item[
+                    "block_text"
+                ],
+                item[
+                    "term_number"
+                ],
+                item[
+                    "block_index"
+                ],
+                item[
+                    "is_last_block"
+                ],
                 body,
             )
         )
@@ -4938,17 +5071,14 @@ def _build_terms_page(
     )
 
     term_pages = (
-        _partition_terms_by_height(
+        _partition_terms_into_blocks(
             selected_terms,
             body,
             terms_page_budget,
         )
     )
 
-    for page_index, (
-        start_index,
-        page_terms,
-    ) in enumerate(
+    for page_index, page_items in enumerate(
         term_pages
     ):
         if page_index > 0:
@@ -4971,10 +5101,9 @@ def _build_terms_page(
             )
         )
 
-        _append_terms_content(
+        _append_terms_page_items(
             story,
-            page_terms,
-            start_index + 1,
+            page_items,
             body,
         )
 

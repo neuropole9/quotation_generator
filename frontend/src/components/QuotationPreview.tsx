@@ -65,9 +65,18 @@ interface DetailPageGroup {
   segments: DetailPartSegment[];
 }
 
+interface TermBlock {
+  key: string;
+  termId: string;
+  termIndex: number;
+  blockIndex: number;
+  text: string;
+  title: string;
+  isLastBlock: boolean;
+}
+
 interface TermsPageGroup {
-  terms: QuotationTerm[];
-  startIndex: number;
+  blocks: TermBlock[];
   usedHeight: number;
 }
 
@@ -1259,67 +1268,129 @@ function DetailPage({
 }
 
 
+function buildTermBlocks(
+  terms: QuotationTerm[],
+): TermBlock[] {
+  return terms.flatMap(
+    (
+      term,
+      termIndex,
+    ) => {
+      const lines =
+        term.text
+          .split(/\r?\n/)
+          .map(
+            (line) =>
+              line.trim(),
+          )
+          .filter(Boolean);
+
+      const safeLines =
+        lines.length > 0
+          ? lines
+          : [
+              term.text.trim(),
+            ];
+
+      const title =
+        safeLines[0] ||
+        `Term ${termIndex + 1}`;
+
+      return safeLines.map(
+        (
+          line,
+          blockIndex,
+        ) => ({
+          key:
+            `${term.id}-${blockIndex}`,
+          termId:
+            term.id,
+          termIndex,
+          blockIndex,
+          text:
+            line,
+          title,
+          isLastBlock:
+            blockIndex ===
+            safeLines.length - 1,
+        }),
+      );
+    },
+  );
+}
+
+
 function buildTermsPageGroups({
-  terms,
-  termHeights,
+  blocks,
+  blockHeights,
   pageBudget,
 }: {
-  terms: QuotationTerm[];
-  termHeights: number[];
+  blocks: TermBlock[];
+  blockHeights: number[];
   pageBudget: number;
 }): TermsPageGroup[] {
-  if (terms.length === 0) {
+  if (blocks.length === 0) {
     return [
       {
-        terms: [],
-        startIndex: 0,
+        blocks: [],
         usedHeight: 0,
       },
     ];
   }
 
-  const pages: TermsPageGroup[] = [];
+  const pages:
+    TermsPageGroup[] = [];
 
-  let currentTerms: QuotationTerm[] = [];
+  let currentBlocks:
+    TermBlock[] = [];
+
   let currentHeight = 0;
-  let currentStartIndex = 0;
 
-  terms.forEach(
+  const pushCurrentPage =
+    () => {
+      if (
+        currentBlocks.length ===
+        0
+      ) {
+        return;
+      }
+
+      pages.push({
+        blocks:
+          currentBlocks,
+        usedHeight:
+          currentHeight,
+      });
+
+      currentBlocks = [];
+      currentHeight = 0;
+    };
+
+  blocks.forEach(
     (
-      term,
+      block,
       index,
     ) => {
       const measuredHeight =
         Math.max(
-          28,
-          termHeights[index] ??
-            42,
+          20,
+          blockHeights[index] ??
+            30,
         );
 
-      const shouldStartNewPage =
-        currentTerms.length > 0 &&
+      const wouldOverflow =
+        currentBlocks.length >
+          0 &&
         currentHeight +
           measuredHeight >
           pageBudget;
 
-      if (shouldStartNewPage) {
-        pages.push({
-          terms:
-            currentTerms,
-          startIndex:
-            currentStartIndex,
-          usedHeight:
-            currentHeight,
-        });
-
-        currentTerms = [];
-        currentHeight = 0;
-        currentStartIndex =
-          index;
+      if (wouldOverflow) {
+        pushCurrentPage();
       }
 
-      currentTerms.push(
-        term,
+      currentBlocks.push(
+        block,
       );
 
       currentHeight +=
@@ -1327,22 +1398,59 @@ function buildTermsPageGroups({
     },
   );
 
-  if (
-    currentTerms.length >
-    0
-  ) {
-    pages.push({
-      terms:
-        currentTerms,
-      startIndex:
-        currentStartIndex,
-      usedHeight:
-        currentHeight,
-    });
-  }
+  pushCurrentPage();
 
   return pages;
 }
+
+
+
+function TermsBlockRow({
+  block,
+}: {
+  block: TermBlock;
+}) {
+  return (
+    <div
+      className="bw-term-block-row"
+      style={{
+        display: "grid",
+        gridTemplateColumns:
+          "34px minmax(0, 1fr)",
+        columnGap: "4px",
+        marginBottom:
+          block.isLastBlock
+            ? "8px"
+            : "2px",
+        breakInside: "avoid",
+      }}
+    >
+      <div
+        style={{
+          fontWeight: 700,
+          textAlign: "right",
+          paddingRight: "2px",
+        }}
+      >
+        {block.blockIndex ===
+        0
+          ? `${block.termIndex + 1}.`
+          : ""}
+      </div>
+
+      <div
+        style={{
+          whiteSpace:
+            "pre-line",
+          minWidth: 0,
+        }}
+      >
+        {block.text}
+      </div>
+    </div>
+  );
+}
+
 
 
 function TermsClosingDetails({
@@ -1451,14 +1559,12 @@ function TermsClosingDetails({
 function TermsPage({
   data,
   pageNumber,
-  pageTerms,
-  startIndex,
+  termsPage,
   showClosingDetails,
 }: {
   data: QuotationData;
   pageNumber: number;
-  pageTerms: QuotationTerm[];
-  startIndex: number;
+  termsPage: TermsPageGroup;
   showClosingDetails: boolean;
 }) {
   const hasSelectableTerms =
@@ -1506,31 +1612,26 @@ function TermsPage({
       <div className="bw-terms-body">
         {hasSelectableTerms ? (
           selectedTerms.length > 0 ? (
-            <ol
+            <div
               className="bw-selected-terms-list"
-              start={
-                startIndex + 1
-              }
+              style={{
+                margin: 0,
+                padding: 0,
+              }}
             >
-              {pageTerms.map(
-                (term) => (
-                  <li
+              {termsPage.blocks.map(
+                (block) => (
+                  <TermsBlockRow
                     key={
-                      term.id
+                      block.key
                     }
-                  >
-                    <span
-                      style={{
-                        whiteSpace:
-                          "pre-line",
-                      }}
-                    >
-                      {term.text}
-                    </span>
-                  </li>
+                    block={
+                      block
+                    }
+                  />
                 ),
               )}
-            </ol>
+            </div>
           ) : (
             <p className="bw-no-terms-message">
               No Terms &amp; Conditions selected.
@@ -2066,6 +2167,17 @@ export default function QuotationPreview({
     Array.isArray(data.terms) &&
     data.terms.length > 0;
 
+  const termBlocks =
+    useMemo(
+      () =>
+        buildTermBlocks(
+          selectedTerms,
+        ),
+      [
+        selectedTerms,
+      ],
+    );
+
   const rowRefs =
     useRef<
       Array<
@@ -2104,13 +2216,14 @@ export default function QuotationPreview({
       null,
     );
 
-  const termRefs =
+  const termBlockRefs =
     useRef<
       Array<
-        HTMLLIElement |
+        HTMLDivElement |
         null
       >
     >([]);
+
 
   const [
     measurements,
@@ -2135,9 +2248,9 @@ export default function QuotationPreview({
   ] = useState({
     headerHeight: 140,
     closingHeight: 330,
-    termHeights:
-      selectedTerms.map(
-        () => 46,
+    blockHeights:
+      termBlocks.map(
+        () => 30,
       ),
   });
 
@@ -2286,18 +2399,18 @@ export default function QuotationPreview({
                   .current,
                 330,
               ),
-            termHeights:
-              selectedTerms.map(
+            blockHeights:
+              termBlocks.map(
                 (
                   _,
                   index,
                 ) =>
                   heightWithMargins(
-                    termRefs
+                    termBlockRefs
                       .current[
                       index
                     ],
-                    46,
+                    30,
                   ),
               ),
           });
@@ -2325,7 +2438,7 @@ export default function QuotationPreview({
       };
     },
     [
-      selectedTerms,
+      termBlocks,
       data.company
         .logoDataUrl,
       data.company
@@ -2388,26 +2501,25 @@ export default function QuotationPreview({
       () =>
         hasSelectableTerms
           ? buildTermsPageGroups({
-              terms:
-                selectedTerms,
-              termHeights:
+              blocks:
+                termBlocks,
+              blockHeights:
                 termsMeasurements
-                  .termHeights,
+                  .blockHeights,
               pageBudget:
                 termsPageBudget,
             })
           : [
               {
-                terms: [],
-                startIndex: 0,
+                blocks: [],
                 usedHeight: 0,
               },
             ],
       [
         hasSelectableTerms,
-        selectedTerms,
+        termBlocks,
         termsMeasurements
-          .termHeights,
+          .blockHeights,
         termsPageBudget,
       ],
     );
@@ -2488,11 +2600,8 @@ export default function QuotationPreview({
               firstTermsPageNumber +
               termsPageIndex
             }
-            pageTerms={
-              termsPage.terms
-            }
-            startIndex={
-              termsPage.startIndex
+            termsPage={
+              termsPage
             }
             showClosingDetails={
               !separateClosingPage &&
@@ -2553,36 +2662,39 @@ export default function QuotationPreview({
         </div>
 
         <div className="bw-terms-body">
-          <ol className="bw-selected-terms-list">
-            {selectedTerms.map(
+          <div
+            className="bw-selected-terms-list"
+            style={{
+              margin: 0,
+              padding: 0,
+            }}
+          >
+            {termBlocks.map(
               (
-                term,
+                block,
                 index,
               ) => (
-                <li
-                  key={`measure-${term.id}`}
+                <div
+                  key={`measure-${block.key}`}
                   ref={(
                     element,
                   ) => {
-                    termRefs
+                    termBlockRefs
                       .current[
                       index
                     ] =
                       element;
                   }}
                 >
-                  <span
-                    style={{
-                      whiteSpace:
-                        "pre-line",
-                    }}
-                  >
-                    {term.text}
-                  </span>
-                </li>
+                  <TermsBlockRow
+                    block={
+                      block
+                    }
+                  />
+                </div>
               ),
             )}
-          </ol>
+          </div>
         </div>
 
         <div
