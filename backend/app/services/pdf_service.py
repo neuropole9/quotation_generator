@@ -88,6 +88,9 @@ PART_EMPTY_ROW_HEIGHT = 10 * mm
 
 GLOBAL_GST_RATE = 18.0
 
+TERMS_PAGE_GAP = 7 * mm
+TERMS_PAGE_SAFETY = 2 * mm
+
 # Keep product rows readable. Extra page space may enlarge a row
 # slightly, but never enough to create oversized rows.
 MAX_ROW_STRETCH = 0.8 * mm
@@ -3984,12 +3987,10 @@ def _build_detail_pages(
             )
 
 
-def _build_terms_page(
-    story: list,
+def _terms_header(
     data: QuotationData,
     body: ParagraphStyle,
-    small_style:
-        ParagraphStyle,
+    small_style: ParagraphStyle,
 ):
     logo = _logo_flowable(
         data.company.logoDataUrl,
@@ -4044,17 +4045,13 @@ def _build_terms_page(
         ParagraphStyle(
             "terms_heading",
             parent=body,
-            fontName=
-                "Helvetica-Bold",
+            fontName="Helvetica-Bold",
             fontSize=18,
             leading=21,
             textColor=BLACK,
         ),
     )
 
-    # Terms page header:
-    # 1) logo at the top-right
-    # 2) Terms & Conditions heading below the logo
     header = Table(
         [
             [
@@ -4135,16 +4132,313 @@ def _build_terms_page(
         )
     )
 
-    story.append(
-        header
+    return header
+
+
+def _term_field(
+    term: Any,
+    field_name: str,
+    default: Any = None,
+):
+    if isinstance(
+        term,
+        dict,
+    ):
+        return term.get(
+            field_name,
+            default,
+        )
+
+    return getattr(
+        term,
+        field_name,
+        default,
     )
-    story.append(
-        Spacer(
-            1,
-            7 * mm,
+
+
+def _selected_quotation_terms(
+    data: QuotationData,
+) -> tuple[
+    bool,
+    list[str],
+]:
+    """
+    Return:
+      (has_selectable_terms, selected_term_texts)
+
+    This is intentionally backward-compatible with old quotations
+    that only contain termsAndConditions.
+    """
+    raw_terms = getattr(
+        data,
+        "terms",
+        None,
+    )
+
+    has_selectable_terms = (
+        isinstance(
+            raw_terms,
+            list,
+        )
+        and len(
+            raw_terms
+        ) > 0
+    )
+
+    if not has_selectable_terms:
+        return (
+            False,
+            [],
+        )
+
+    selected_terms: list[str] = []
+
+    for term in raw_terms:
+        selected = bool(
+            _term_field(
+                term,
+                "selected",
+                False,
+            )
+        )
+
+        term_text = str(
+            _term_field(
+                term,
+                "text",
+                "",
+            )
+            or ""
+        ).strip()
+
+        if (
+            selected
+            and term_text
+        ):
+            selected_terms.append(
+                term_text
+            )
+
+    return (
+        True,
+        selected_terms,
+    )
+
+
+def _terms_body_style(
+    body: ParagraphStyle,
+) -> ParagraphStyle:
+    return ParagraphStyle(
+        "terms_body",
+        parent=body,
+        fontSize=8.2,
+        leading=10.5,
+        alignment=TA_LEFT,
+        textColor=BLACK,
+        spaceAfter=4,
+    )
+
+
+def _term_flowables(
+    term_text: str,
+    number: int,
+    body: ParagraphStyle,
+) -> list:
+    clean_text = (
+        safe_text(
+            term_text,
+            "",
+        )
+        .replace(
+            "\n",
+            "<br/>",
         )
     )
 
+    if not clean_text:
+        return []
+
+    return [
+        Paragraph(
+            (
+                f"<b>{number}.</b> "
+                f"{clean_text}"
+            ),
+            _terms_body_style(
+                body
+            ),
+        ),
+        Spacer(
+            1,
+            1.2 * mm,
+        ),
+    ]
+
+
+def _flowable_total_height(
+    flowable,
+) -> float:
+    _, height = flowable.wrap(
+        CONTENT_WIDTH,
+        USABLE_FRAME_HEIGHT,
+    )
+
+    space_before = (
+        flowable.getSpaceBefore()
+        if hasattr(
+            flowable,
+            "getSpaceBefore",
+        )
+        else 0.0
+    )
+
+    space_after = (
+        flowable.getSpaceAfter()
+        if hasattr(
+            flowable,
+            "getSpaceAfter",
+        )
+        else 0.0
+    )
+
+    return (
+        float(height)
+        + float(
+            space_before
+            or 0
+        )
+        + float(
+            space_after
+            or 0
+        )
+    )
+
+
+def _term_height(
+    term_text: str,
+    number: int,
+    body: ParagraphStyle,
+) -> float:
+    return sum(
+        _flowable_total_height(
+            flowable
+        )
+        for flowable
+        in _term_flowables(
+            term_text,
+            number,
+            body,
+        )
+    )
+
+
+def _partition_terms_by_height(
+    terms: list[str],
+    body: ParagraphStyle,
+    page_budget: float,
+) -> list[
+    tuple[
+        int,
+        list[str],
+    ]
+]:
+    if not terms:
+        return [
+            (
+                0,
+                [],
+            )
+        ]
+
+    pages: list[
+        tuple[
+            int,
+            list[str],
+        ]
+    ] = []
+
+    current_terms: list[str] = []
+    current_height = 0.0
+    current_start_index = 0
+
+    for index, term_text in enumerate(
+        terms
+    ):
+        measured_height = max(
+            20.0,
+            _term_height(
+                term_text,
+                index + 1,
+                body,
+            ),
+        )
+
+        should_start_new_page = (
+            bool(
+                current_terms
+            )
+            and
+            current_height
+            + measured_height
+            > page_budget
+        )
+
+        if should_start_new_page:
+            pages.append(
+                (
+                    current_start_index,
+                    current_terms,
+                )
+            )
+
+            current_terms = []
+            current_height = 0.0
+            current_start_index = index
+
+        current_terms.append(
+            term_text
+        )
+
+        current_height += (
+            measured_height
+        )
+
+    if current_terms:
+        pages.append(
+            (
+                current_start_index,
+                current_terms,
+            )
+        )
+
+    return pages
+
+
+def _append_terms_content(
+    story: list,
+    terms: list[str],
+    start_number: int,
+    body: ParagraphStyle,
+):
+    for offset, term_text in enumerate(
+        terms
+    ):
+        story.extend(
+            _term_flowables(
+                term_text,
+                start_number
+                + offset,
+                body,
+            )
+        )
+
+
+
+def _append_legacy_terms_content(
+    story: list,
+    data: QuotationData,
+    body: ParagraphStyle,
+):
     terms_text = (
         data.termsAndConditions
         or
@@ -4152,7 +4446,7 @@ def _build_terms_page(
     ).strip()
 
     terms_style = ParagraphStyle(
-        "terms_body",
+        "legacy_terms_body",
         parent=body,
         fontSize=9,
         leading=12,
@@ -4195,10 +4489,65 @@ def _build_terms_page(
             )
         )
 
+
+def _append_terms_closing_details(
+    story: list,
+    data: QuotationData,
+    body: ParagraphStyle,
+):
+    closing_style = ParagraphStyle(
+        "terms_closing_note",
+        parent=body,
+        fontSize=9,
+        leading=13,
+        alignment=TA_LEFT,
+        textColor=BLACK,
+        spaceAfter=7,
+    )
+
+    story.append(
+        Paragraph(
+            safe_text(
+                "We hope you will find our offer quite competitive and in line with your requirements and request you to favor us with your value order."
+            ),
+            closing_style,
+        )
+    )
+
     story.append(
         Spacer(
             1,
-            12 * mm,
+            2 * mm,
+        )
+    )
+
+    story.append(
+        Paragraph(
+            safe_text(
+                "In case you need, any further clarifications on the subject please feel free to contact us thanking you and assuring you of our best services at all times."
+            ),
+            closing_style,
+        )
+    )
+
+    story.append(
+        Spacer(
+            1,
+            2 * mm,
+        )
+    )
+
+    story.append(
+        Paragraph(
+            "Thanking you",
+            closing_style,
+        )
+    )
+
+    story.append(
+        Spacer(
+            1,
+            7 * mm,
         )
     )
 
@@ -4220,8 +4569,7 @@ def _build_terms_page(
             ParagraphStyle(
                 "terms_company_name",
                 parent=body,
-                fontName=
-                    "Helvetica-Bold",
+                fontName="Helvetica-Bold",
                 fontSize=9,
                 leading=12,
             ),
@@ -4337,8 +4685,7 @@ def _build_terms_page(
             ParagraphStyle(
                 "bank_details_heading",
                 parent=body,
-                fontName=
-                    "Helvetica-Bold",
+                fontName="Helvetica-Bold",
                 fontSize=11,
                 leading=14,
                 textColor=BLACK,
@@ -4464,6 +4811,191 @@ def _build_terms_page(
             ]
         )
     )
+
+
+def _build_terms_page(
+    story: list,
+    data: QuotationData,
+    body: ParagraphStyle,
+    small_style: ParagraphStyle,
+):
+    """
+    Build Terms & Conditions pages using measured content height.
+
+    The PDF no longer uses a fixed number of terms per page.
+    Each Terms page is filled with as many complete terms as will
+    fit. The closing note, company/signature block and bank details
+    are appended immediately after the final term and use any
+    remaining space before ReportLab creates another page.
+    """
+    (
+        has_selectable_terms,
+        selected_terms,
+    ) = _selected_quotation_terms(
+        data
+    )
+
+    if not has_selectable_terms:
+        story.append(
+            _terms_header(
+                data,
+                body,
+                small_style,
+            )
+        )
+
+        story.append(
+            Spacer(
+                1,
+                TERMS_PAGE_GAP,
+            )
+        )
+
+        _append_legacy_terms_content(
+            story,
+            data,
+            body,
+        )
+
+        story.append(
+            Spacer(
+                1,
+                6 * mm,
+            )
+        )
+
+        _append_terms_closing_details(
+            story,
+            data,
+            body,
+        )
+
+        return
+
+    if not selected_terms:
+        story.append(
+            _terms_header(
+                data,
+                body,
+                small_style,
+            )
+        )
+
+        story.append(
+            Spacer(
+                1,
+                TERMS_PAGE_GAP,
+            )
+        )
+
+        story.append(
+            Paragraph(
+                "No Terms &amp; Conditions selected.",
+                ParagraphStyle(
+                    "no_selected_terms",
+                    parent=body,
+                    fontSize=9,
+                    leading=12,
+                    alignment=TA_LEFT,
+                    textColor=BLACK,
+                ),
+            )
+        )
+
+        story.append(
+            Spacer(
+                1,
+                6 * mm,
+            )
+        )
+
+        _append_terms_closing_details(
+            story,
+            data,
+            body,
+        )
+
+        return
+
+    header_sample = _terms_header(
+        data,
+        body,
+        small_style,
+    )
+
+    header_height = (
+        _measure_table_height(
+            header_sample
+        )
+    )
+
+    terms_page_budget = max(
+        120.0,
+        USABLE_FRAME_HEIGHT
+        - header_height
+        - TERMS_PAGE_GAP
+        - TERMS_PAGE_SAFETY,
+    )
+
+    term_pages = (
+        _partition_terms_by_height(
+            selected_terms,
+            body,
+            terms_page_budget,
+        )
+    )
+
+    for page_index, (
+        start_index,
+        page_terms,
+    ) in enumerate(
+        term_pages
+    ):
+        if page_index > 0:
+            story.append(
+                PageBreak()
+            )
+
+        story.append(
+            _terms_header(
+                data,
+                body,
+                small_style,
+            )
+        )
+
+        story.append(
+            Spacer(
+                1,
+                TERMS_PAGE_GAP,
+            )
+        )
+
+        _append_terms_content(
+            story,
+            page_terms,
+            start_index + 1,
+            body,
+        )
+
+    # Important: no forced PageBreak here.
+    # The closing content consumes the remaining space on the final
+    # Terms page. ReportLab will create another page only when the
+    # remaining content genuinely cannot fit.
+    story.append(
+        Spacer(
+            1,
+            5 * mm,
+        )
+    )
+
+    _append_terms_closing_details(
+        story,
+        data,
+        body,
+    )
+
+
 
 def build_pdf(
     data: QuotationData,

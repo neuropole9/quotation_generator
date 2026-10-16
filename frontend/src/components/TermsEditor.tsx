@@ -11,6 +11,7 @@ import type {
 
 import {
   createDefaultTerms,
+  DEFAULT_QUOTATION_TERMS,
 } from "../constants/defaultTerms";
 
 interface Props {
@@ -288,7 +289,7 @@ export default function TermsEditor({
           type="button"
           onClick={restoreDefaults}
         >
-          Restore 9 defaults
+          Restore {DEFAULT_QUOTATION_TERMS.length} defaults
         </button>
       </div>
 

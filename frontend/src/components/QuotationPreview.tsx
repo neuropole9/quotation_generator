@@ -10,6 +10,7 @@ import type {
   ProductLine,
   QuotationColumn,
   QuotationData,
+  QuotationTerm,
 } from "../types/quotation";
 
 import {
@@ -25,6 +26,11 @@ const DETAIL_INNER_HEIGHT = 905;
 const DETAIL_GAP = 14;
 const DETAIL_SAFETY = 8;
 const GLOBAL_GST_RATE = 18;
+
+const TERMS_INNER_HEIGHT = 905;
+const TERMS_GAP = 14;
+const TERMS_SAFETY = 14;
+const TERMS_LIST_OVERHEAD = 8;
 
 const QUOTATION_FONT =
   "Helvetica, Arial, sans-serif";
@@ -57,6 +63,12 @@ interface DetailPartSegment {
 
 interface DetailPageGroup {
   segments: DetailPartSegment[];
+}
+
+interface TermsPageGroup {
+  terms: QuotationTerm[];
+  startIndex: number;
+  usedHeight: number;
 }
 
 const valueOrDash = (
@@ -1246,31 +1258,98 @@ function DetailPage({
   );
 }
 
-function TermsPage({
+
+function buildTermsPageGroups({
+  terms,
+  termHeights,
+  pageBudget,
+}: {
+  terms: QuotationTerm[];
+  termHeights: number[];
+  pageBudget: number;
+}): TermsPageGroup[] {
+  if (terms.length === 0) {
+    return [
+      {
+        terms: [],
+        startIndex: 0,
+        usedHeight: 0,
+      },
+    ];
+  }
+
+  const pages: TermsPageGroup[] = [];
+
+  let currentTerms: QuotationTerm[] = [];
+  let currentHeight = 0;
+  let currentStartIndex = 0;
+
+  terms.forEach(
+    (
+      term,
+      index,
+    ) => {
+      const measuredHeight =
+        Math.max(
+          28,
+          termHeights[index] ??
+            42,
+        );
+
+      const shouldStartNewPage =
+        currentTerms.length > 0 &&
+        currentHeight +
+          measuredHeight >
+          pageBudget;
+
+      if (shouldStartNewPage) {
+        pages.push({
+          terms:
+            currentTerms,
+          startIndex:
+            currentStartIndex,
+          usedHeight:
+            currentHeight,
+        });
+
+        currentTerms = [];
+        currentHeight = 0;
+        currentStartIndex =
+          index;
+      }
+
+      currentTerms.push(
+        term,
+      );
+
+      currentHeight +=
+        measuredHeight;
+    },
+  );
+
+  if (
+    currentTerms.length >
+    0
+  ) {
+    pages.push({
+      terms:
+        currentTerms,
+      startIndex:
+        currentStartIndex,
+      usedHeight:
+        currentHeight,
+    });
+  }
+
+  return pages;
+}
+
+
+function TermsClosingDetails({
   data,
-  pageNumber,
 }: {
   data: QuotationData;
-  pageNumber: number;
 }) {
-  const hasSelectableTerms =
-    Array.isArray(data.terms) &&
-    data.terms.length > 0;
-
-  const selectedTerms =
-    hasSelectableTerms
-      ? data.terms!.filter(
-          (term) =>
-            term.selected &&
-            term.text?.trim(),
-        )
-      : [];
-
-  const legacyTerms =
-    data.termsAndConditions
-      ?.trim() ||
-    "No Terms & Conditions specified.";
-
   const companyName =
     data.company.name?.trim() ||
     data.company.footerLine1?.trim() ||
@@ -1294,6 +1373,111 @@ function TermsPage({
       "Hitech City-3",
     ],
   ];
+
+  return (
+    <div className="bw-terms-company-signature">
+      <div
+        className="bw-terms-closing-note"
+        style={{
+          marginBottom: "28px",
+          fontSize: "13px",
+          lineHeight: 1.6,
+          textAlign: "left",
+        }}
+      >
+        <p style={{ margin: "0 0 14px" }}>
+          We hope you will find our offer quite competitive and in line with your requirements and request you to favor us with your value order.
+        </p>
+
+        <p style={{ margin: "0 0 14px" }}>
+          In case you need, any further clarifications on the subject please feel free to contact us thanking you and assuring you of our best services at all times.
+        </p>
+
+        <p style={{ margin: 0 }}>
+          Thanking you
+        </p>
+      </div>
+
+      <div className="bw-terms-company-name">
+        {companyName}
+      </div>
+
+      <div className="bw-signature-preview-block">
+        {data.company
+          .signatureImageDataUrl ? (
+          <img
+            className="bw-signature-image"
+            src={
+              data.company
+                .signatureImageDataUrl
+            }
+            alt="Authorized digital signature"
+          />
+        ) : null}
+
+        <div className="bw-authorized-signature-label">
+          Authorized Signature
+        </div>
+      </div>
+
+      <h2 className="bw-bank-details-heading">
+        BANK DETAILS
+      </h2>
+
+      <table className="bw-bank-details-table">
+        <tbody>
+          {bankRows.map(
+            ([
+              label,
+              value,
+            ]) => (
+              <tr key={label}>
+                <th>
+                  {label}
+                </th>
+
+                <td>
+                  {value}
+                </td>
+              </tr>
+            ),
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function TermsPage({
+  data,
+  pageNumber,
+  pageTerms,
+  startIndex,
+  showClosingDetails,
+}: {
+  data: QuotationData;
+  pageNumber: number;
+  pageTerms: QuotationTerm[];
+  startIndex: number;
+  showClosingDetails: boolean;
+}) {
+  const hasSelectableTerms =
+    Array.isArray(data.terms) &&
+    data.terms.length > 0;
+
+  const selectedTerms =
+    hasSelectableTerms
+      ? data.terms!.filter(
+          (term) =>
+            term.selected &&
+            term.text?.trim(),
+        )
+      : [];
+
+  const legacyTerms =
+    data.termsAndConditions
+      ?.trim() ||
+    "No Terms & Conditions specified.";
 
   return (
     <article
@@ -1322,12 +1506,30 @@ function TermsPage({
       <div className="bw-terms-body">
         {hasSelectableTerms ? (
           selectedTerms.length > 0 ? (
-            <ol className="bw-selected-terms-list">
-              {selectedTerms.map((term) => (
-                <li key={term.id}>
-                  <span>{term.text}</span>
-                </li>
-              ))}
+            <ol
+              className="bw-selected-terms-list"
+              start={
+                startIndex + 1
+              }
+            >
+              {pageTerms.map(
+                (term) => (
+                  <li
+                    key={
+                      term.id
+                    }
+                  >
+                    <span
+                      style={{
+                        whiteSpace:
+                          "pre-line",
+                      }}
+                    >
+                      {term.text}
+                    </span>
+                  </li>
+                ),
+              )}
             </ol>
           ) : (
             <p className="bw-no-terms-message">
@@ -1335,62 +1537,59 @@ function TermsPage({
             </p>
           )
         ) : (
-          legacyTerms
+          <p
+            style={{
+              whiteSpace:
+                "pre-line",
+            }}
+          >
+            {legacyTerms}
+          </p>
         )}
       </div>
 
+      {showClosingDetails ? (
+        <TermsClosingDetails
+          data={data}
+        />
+      ) : null}
+
+      <DocumentFooter
+        data={data}
+        pageNumber={
+          pageNumber
+        }
+      />
+    </article>
+  );
+}
+
+function TermsClosingPage({
+  data,
+  pageNumber,
+}: {
+  data: QuotationData;
+  pageNumber: number;
+}) {
+  return (
+    <article
+      className="bw-page bw-terms-page"
+      style={{
+        fontFamily:
+          QUOTATION_FONT,
+      }}
+    >
       <div
-        className="bw-terms-company-signature"
+        className="bw-terms-header"
       >
-        <div className="bw-terms-company-name">
-          {companyName}
-        </div>
-
-        <div className="bw-signature-preview-block">
-          {data.company
-            .signatureImageDataUrl ? (
-            <img
-              className="bw-signature-image"
-              src={
-                data.company
-                  .signatureImageDataUrl
-              }
-              alt="Authorized digital signature"
-            />
-          ) : null}
-
-          <div className="bw-authorized-signature-label">
-            Authorized Signature
-          </div>
-        </div>
-
-        <h2 className="bw-bank-details-heading">
-          BANK DETAILS
-        </h2>
-
-        <table
-          className="bw-bank-details-table"
-        >
-          <tbody>
-            {bankRows.map(
-              ([
-                label,
-                value,
-              ]) => (
-                <tr key={label}>
-                  <th>
-                    {label}
-                  </th>
-
-                  <td>
-                    {value}
-                  </td>
-                </tr>
-              ),
-            )}
-          </tbody>
-        </table>
+        <DocumentLogo
+          data={data}
+        />
       </div>
+
+      <TermsClosingDetails
+        data={data}
+      />
 
       <DocumentFooter
         data={data}
@@ -1846,6 +2045,27 @@ export default function QuotationPreview({
           : column,
     );
 
+  const selectedTerms =
+    useMemo(
+      () =>
+        Array.isArray(
+          data.terms,
+        )
+          ? data.terms.filter(
+              (term) =>
+                term.selected &&
+                term.text?.trim(),
+            )
+          : [],
+      [
+        data.terms,
+      ],
+    );
+
+  const hasSelectableTerms =
+    Array.isArray(data.terms) &&
+    data.terms.length > 0;
+
   const rowRefs =
     useRef<
       Array<
@@ -1874,6 +2094,24 @@ export default function QuotationPreview({
       null,
     );
 
+  const termsHeaderRef =
+    useRef<HTMLDivElement | null>(
+      null,
+    );
+
+  const termsClosingRef =
+    useRef<HTMLDivElement | null>(
+      null,
+    );
+
+  const termRefs =
+    useRef<
+      Array<
+        HTMLLIElement |
+        null
+      >
+    >([]);
+
   const [
     measurements,
     setMeasurements,
@@ -1889,6 +2127,18 @@ export default function QuotationPreview({
     totalsHeight: 96,
     continuationHeight:
       18,
+  });
+
+  const [
+    termsMeasurements,
+    setTermsMeasurements,
+  ] = useState({
+    headerHeight: 140,
+    closingHeight: 330,
+    termHeights:
+      selectedTerms.map(
+        () => 46,
+      ),
   });
 
   useLayoutEffect(
@@ -1981,6 +2231,111 @@ export default function QuotationPreview({
     ],
   );
 
+  useLayoutEffect(
+    () => {
+      const heightWithMargins =
+        (
+          element:
+            HTMLElement |
+            null,
+          fallback: number,
+        ) => {
+          if (!element) {
+            return fallback;
+          }
+
+          const rect =
+            element
+              .getBoundingClientRect();
+
+          const style =
+            window
+              .getComputedStyle(
+                element,
+              );
+
+          const marginTop =
+            Number.parseFloat(
+              style.marginTop,
+            ) || 0;
+
+          const marginBottom =
+            Number.parseFloat(
+              style.marginBottom,
+            ) || 0;
+
+          return Math.ceil(
+            rect.height +
+              marginTop +
+              marginBottom,
+          );
+        };
+
+      const measure =
+        () => {
+          setTermsMeasurements({
+            headerHeight:
+              heightWithMargins(
+                termsHeaderRef
+                  .current,
+                140,
+              ),
+            closingHeight:
+              heightWithMargins(
+                termsClosingRef
+                  .current,
+                330,
+              ),
+            termHeights:
+              selectedTerms.map(
+                (
+                  _,
+                  index,
+                ) =>
+                  heightWithMargins(
+                    termRefs
+                      .current[
+                      index
+                    ],
+                    46,
+                  ),
+              ),
+          });
+        };
+
+      const frame =
+        requestAnimationFrame(
+          measure,
+        );
+
+      const timer =
+        window.setTimeout(
+          measure,
+          120,
+        );
+
+      return () => {
+        cancelAnimationFrame(
+          frame,
+        );
+
+        window.clearTimeout(
+          timer,
+        );
+      };
+    },
+    [
+      selectedTerms,
+      data.company
+        .logoDataUrl,
+      data.company
+        .signatureImageDataUrl,
+      data.company.name,
+      data.company
+        .footerLine1,
+    ],
+  );
+
   const detailPages =
     useMemo(
       () => {
@@ -2017,9 +2372,72 @@ export default function QuotationPreview({
       ],
     );
 
-  const termsPageNumber =
+  const termsPageBudget =
+    Math.max(
+      180,
+      TERMS_INNER_HEIGHT -
+        termsMeasurements
+          .headerHeight -
+        TERMS_GAP -
+        TERMS_SAFETY -
+        TERMS_LIST_OVERHEAD,
+    );
+
+  const termsPages =
+    useMemo(
+      () =>
+        hasSelectableTerms
+          ? buildTermsPageGroups({
+              terms:
+                selectedTerms,
+              termHeights:
+                termsMeasurements
+                  .termHeights,
+              pageBudget:
+                termsPageBudget,
+            })
+          : [
+              {
+                terms: [],
+                startIndex: 0,
+                usedHeight: 0,
+              },
+            ],
+      [
+        hasSelectableTerms,
+        selectedTerms,
+        termsMeasurements
+          .termHeights,
+        termsPageBudget,
+      ],
+    );
+
+  const termsPageCount =
+    Math.max(
+      1,
+      termsPages.length,
+    );
+
+  const firstTermsPageNumber =
     2 +
     detailPages.length;
+
+  const lastTermsPage =
+    termsPages[
+      termsPages.length - 1
+    ];
+
+  const separateClosingPage =
+    hasSelectableTerms &&
+    selectedTerms.length > 0 &&
+    Boolean(
+      lastTermsPage &&
+        lastTermsPage
+          .usedHeight +
+          termsMeasurements
+            .closingHeight >
+          termsPageBudget,
+    );
 
   const widths =
     getColumnWidths(
@@ -2058,12 +2476,125 @@ export default function QuotationPreview({
         ),
       )}
 
-      <TermsPage
-        data={data}
-        pageNumber={
-          termsPageNumber
-        }
-      />
+      {termsPages.map(
+        (
+          termsPage,
+          termsPageIndex,
+        ) => (
+          <TermsPage
+            key={`terms-page-${termsPageIndex}`}
+            data={data}
+            pageNumber={
+              firstTermsPageNumber +
+              termsPageIndex
+            }
+            pageTerms={
+              termsPage.terms
+            }
+            startIndex={
+              termsPage.startIndex
+            }
+            showClosingDetails={
+              !separateClosingPage &&
+              termsPageIndex ===
+                termsPageCount - 1
+            }
+          />
+        ),
+      )}
+
+      {separateClosingPage ? (
+        <TermsClosingPage
+          data={data}
+          pageNumber={
+            firstTermsPageNumber +
+            termsPageCount
+          }
+        />
+      ) : null}
+
+      {/* Off-screen Terms measurement copy */}
+      <div
+        aria-hidden="true"
+        className="bw-terms-page"
+        style={{
+          position:
+            "fixed",
+          left:
+            "-12000px",
+          top: 0,
+          width: "686px",
+          visibility:
+            "hidden",
+          pointerEvents:
+            "none",
+          zIndex: -1,
+          fontFamily:
+            QUOTATION_FONT,
+        }}
+      >
+        <div
+          ref={
+            termsHeaderRef
+          }
+          className="bw-terms-header"
+        >
+          <DocumentLogo
+            data={data}
+          />
+
+          <div className="bw-terms-title-block">
+            <h1
+              style={HEADING_STYLE}
+            >
+              TERMS &amp; CONDITIONS
+            </h1>
+          </div>
+        </div>
+
+        <div className="bw-terms-body">
+          <ol className="bw-selected-terms-list">
+            {selectedTerms.map(
+              (
+                term,
+                index,
+              ) => (
+                <li
+                  key={`measure-${term.id}`}
+                  ref={(
+                    element,
+                  ) => {
+                    termRefs
+                      .current[
+                      index
+                    ] =
+                      element;
+                  }}
+                >
+                  <span
+                    style={{
+                      whiteSpace:
+                        "pre-line",
+                    }}
+                  >
+                    {term.text}
+                  </span>
+                </li>
+              ),
+            )}
+          </ol>
+        </div>
+
+        <div
+          ref={
+            termsClosingRef
+          }
+        >
+          <TermsClosingDetails
+            data={data}
+          />
+        </div>
+      </div>
 
       {/* Off-screen measurement copy */}
       <div
