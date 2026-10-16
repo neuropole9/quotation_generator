@@ -1524,7 +1524,7 @@ function TermsClosingDetails({
         ) : null}
 
         <div className="bw-authorized-signature-label">
-          Authorized Signature
+          Authorized Signatory
         </div>
       </div>
 

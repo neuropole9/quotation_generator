@@ -4748,7 +4748,7 @@ def _append_terms_closing_details(
         [
             [
                 Paragraph(
-                    "<b>Authorized Signature</b>",
+                    "<b>Authorized Signatory</b>",
                     ParagraphStyle(
                         "signature_label",
                         parent=body,
