@@ -17,6 +17,9 @@ import {
 
 import PdfImportModal from "../components/PdfImportModal";
 
+import FullQuotationImportModal from "../components/FullQuotationImportModal";
+import type { FullQuotationExtractedData } from "../api/fullPdfImport";
+
 import ProductEditor from "../components/ProductEditor";
 
 import QuotationPreview from "../components/QuotationPreview";
@@ -2003,6 +2006,17 @@ export default function QuotationBuilder({
 
   const [
 
+    showFullPdfImport,
+
+    setShowFullPdfImport,
+
+  ] =
+
+    useState(false);
+
+
+  const [
+
     savedQuotationId,
 
     setSavedQuotationId,
@@ -3486,6 +3500,264 @@ export default function QuotationBuilder({
 
 
   /* =======================================================
+
+     FULL QUOTATION PDF IMPORT
+
+     This is intentionally separate from the existing
+     part-wise product PDF import.
+
+  ======================================================= */
+
+
+  const handleFullQuotationImport = (
+
+    imported:
+      FullQuotationExtractedData,
+
+  ) => {
+
+    setData(
+
+      (previous) => {
+
+        const importedCompany =
+          imported.company ||
+          {};
+
+
+        const importedCustomer =
+          imported.customer ||
+          {};
+
+
+        const importedQuote =
+          imported.quote ||
+          {};
+
+
+        const importedProject =
+          imported.project ||
+          {};
+
+
+        const nextAbstractItems =
+          Array.isArray(
+            imported.abstractItems,
+          ) &&
+          imported.abstractItems.length >
+            0
+
+            ? imported.abstractItems
+
+            : previous.abstractItems;
+
+
+        const nextProducts =
+          Array.isArray(
+            imported.products,
+          ) &&
+          imported.products.length >
+            0
+
+            ? imported.products
+
+            : previous.products;
+
+
+        const nextTerms =
+          Array.isArray(
+            imported.terms,
+          ) &&
+          imported.terms.length >
+            0
+
+            ? imported.terms
+
+            : previous.terms;
+
+
+        return {
+
+          ...previous,
+
+
+          /*
+           * Preserve application-owned visual assets.
+           * The visible company/bank text can come from PDF,
+           * but an imported PDF should not erase the configured
+           * logo or digital signature.
+           */
+
+          company: {
+
+            ...previous.company,
+
+            ...importedCompany,
+
+            logoDataUrl:
+              previous.company
+                .logoDataUrl,
+
+            signatureImageDataUrl:
+              previous.company
+                .signatureImageDataUrl,
+
+          },
+
+
+          customer: {
+
+            ...previous.customer,
+
+            ...importedCustomer,
+
+          },
+
+
+          quote: {
+
+            ...previous.quote,
+
+            ...importedQuote,
+
+            validUntil:
+              importedQuote
+                .validUntil ||
+              previous.quote
+                .validUntil,
+
+          },
+
+
+          /*
+           * Import project fields that are visibly present in the PDF
+           * (for example PROJECT TYPE = VILLA) and preserve any editor
+           * fields that the PDF does not contain.
+           */
+
+          project: {
+
+            ...previous.project,
+
+            ...Object.fromEntries(
+
+              Object.entries(
+
+                importedProject,
+
+              ).filter(
+
+                ([, value]) =>
+
+                  String(
+
+                    value ?? "",
+
+                  ).trim() !== "",
+
+              ),
+
+            ),
+
+          },
+
+
+          abstractItems:
+            nextAbstractItems,
+
+
+          products:
+            nextProducts,
+
+
+          notes:
+            imported.notes ||
+            previous.notes,
+
+
+          terms:
+            nextTerms,
+
+
+          termsAndConditions:
+            imported
+              .termsAndConditions ||
+            previous
+              .termsAndConditions,
+
+        };
+
+      },
+
+    );
+
+
+    /*
+     * Full-PDF import starts a NEW editable quotation.
+     * This prevents accidentally overwriting a quotation
+     * record that happened to be open before the import.
+     */
+
+    setSavedQuotationId(
+
+      null,
+
+    );
+
+
+    setSavedQuotationStatus(
+
+      null,
+
+    );
+
+
+    setSaveMessage(
+
+      "Full quotation imported. Review the fields, then save it as a new quotation.",
+
+    );
+
+
+    setShowFullPdfImport(
+
+      false,
+
+    );
+
+
+    setShowSavedQuotations(
+
+      false,
+
+    );
+
+
+    setShowPreview(
+
+      false,
+
+    );
+
+
+    setActiveEditorPage(
+
+      "first",
+
+    );
+
+
+    setError(
+
+      "",
+
+    );
+
+  };
+
+
+
+  /* =======================================================
      SELECTABLE TERMS
   ======================================================= */
 
@@ -3522,54 +3794,6 @@ export default function QuotationBuilder({
      SAMPLE / CLEAR
 
   ======================================================= */
-
-
-
-  const handleLoadSample =
-
-    () => {
-
-      setData(
-
-        createInitialData(
-
-          selectedTemplate,
-
-        ),
-
-      );
-
-
-      setSavedQuotationId(
-
-        null,
-
-      );
-
-
-      setSavedQuotationStatus(
-
-        null,
-
-      );
-
-
-      setSaveMessage(
-
-        "",
-
-      );
-
-
-
-      setError("");
-
-    };
-
-
-
-
-
   const handleClearAll =
 
     () => {
@@ -5636,6 +5860,34 @@ export default function QuotationBuilder({
 
 
 
+        <FullQuotationImportModal
+
+          open={
+
+            showFullPdfImport
+
+          }
+
+          onClose={() =>
+
+            setShowFullPdfImport(
+
+              false,
+
+            )
+
+          }
+
+          onImport={
+
+            handleFullQuotationImport
+
+          }
+
+        />
+
+
+
         <PdfImportModal
 
           open={
@@ -5733,27 +5985,6 @@ export default function QuotationBuilder({
 
 
         <div className="builder-actions">
-
-          <button
-
-            type="button"
-
-            className="secondary-button"
-
-            onClick={
-
-              handleLoadSample
-
-            }
-
-          >
-
-            Load Sample Data
-
-          </button>
-
-
-
           <button
 
             type="button"
@@ -5769,6 +6000,29 @@ export default function QuotationBuilder({
           >
 
             Clear All
+
+          </button>
+
+
+          <button
+
+            type="button"
+
+            className="secondary-button"
+
+            onClick={() =>
+
+              setShowFullPdfImport(
+
+                true,
+
+              )
+
+            }
+
+          >
+
+            Import Full Quotation PDF
 
           </button>
 
@@ -8668,6 +8922,43 @@ export default function QuotationBuilder({
       </main>
 
 
+
+
+
+      {/* ===============================================
+
+          FULL QUOTATION PDF IMPORT MODAL
+
+          Separate from the existing part-wise product importer.
+
+      =============================================== */}
+
+
+      <FullQuotationImportModal
+
+        open={
+
+          showFullPdfImport
+
+        }
+
+        onClose={() =>
+
+          setShowFullPdfImport(
+
+            false,
+
+          )
+
+        }
+
+        onImport={
+
+          handleFullQuotationImport
+
+        }
+
+      />
 
 
 
