@@ -324,77 +324,22 @@ def _signature_flowable(
         return None
 
     try:
-        signature_image = Image(
+        signature = Image(
             image_stream,
             width=40 * mm,
             height=16 * mm,
             kind="proportional",
         )
 
-        # Force the signature image itself to the left.
-        signature_image.hAlign = "LEFT"
+        # Keep the digital signature aligned with the company name
+        # and Authorized Signatory label on the LEFT side.
+        signature.hAlign = "LEFT"
 
-        # Wrap it in a fixed-width left-aligned table so ReportLab
-        # cannot center it within the available page width.
-        signature_table = Table(
-            [
-                [
-                    signature_image,
-                ]
-            ],
-            colWidths=[
-                48 * mm,
-            ],
-            hAlign="LEFT",
-        )
-
-        signature_table.setStyle(
-            TableStyle(
-                [
-                    (
-                        "ALIGN",
-                        (0, 0),
-                        (0, 0),
-                        "LEFT",
-                    ),
-                    (
-                        "VALIGN",
-                        (0, 0),
-                        (0, 0),
-                        "BOTTOM",
-                    ),
-                    (
-                        "LEFTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        0,
-                    ),
-                    (
-                        "RIGHTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        0,
-                    ),
-                    (
-                        "TOPPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        0,
-                    ),
-                    (
-                        "BOTTOMPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        0,
-                    ),
-                ]
-            )
-        )
-
-        return signature_table
+        return signature
 
     except Exception:
         return None
+
 
 def _is_model_column(
     column: QuotationColumn,
@@ -4316,29 +4261,121 @@ def _terms_subpoint_style(
 def _split_term_blocks(
     term_text: str,
 ) -> list[str]:
-    blocks = [
-        line.strip()
-        for line
-        in str(
-            term_text
-            or ""
-        ).splitlines()
-        if line.strip()
-    ]
+    """
+    Split long Terms & Conditions entries into readable blocks.
 
-    if blocks:
-        return blocks
+    Example input:
+        AMC a. Scope ... b. Hardware ... c. Cloud ... d. Payment ...
 
+    Output blocks:
+        AMC
+        a. Scope ...
+        b. Hardware ...
+        c. Cloud ...
+        d. Payment ...
+
+    Every alphabetic subpoint (a., b., c., d. ... z.) becomes its own
+    paragraph/line. Existing manual line breaks are also preserved.
+    """
     clean = str(
         term_text
         or ""
     ).strip()
 
-    return (
-        [clean]
-        if clean
-        else []
+    if not clean:
+        return []
+
+    source_lines = [
+        re.sub(
+            r"[ \t]+",
+            " ",
+            line,
+        ).strip()
+        for line in clean.splitlines()
+        if line.strip()
+    ]
+
+    if not source_lines:
+        source_lines = [
+            re.sub(
+                r"[ \t]+",
+                " ",
+                clean,
+            ).strip()
+        ]
+
+    blocks: list[str] = []
+
+    # IMPORTANT: use real regex escapes (\S, \., \s), not double-escaped
+    # literals. The previous pattern therefore failed to detect a./b./c.
+    marker_pattern = re.compile(
+        r"(?<!\S)([a-z])\.\s+(?=\S)",
+        flags=re.IGNORECASE,
     )
+
+    for line in source_lines:
+        markers = list(
+            marker_pattern.finditer(
+                line
+            )
+        )
+
+        if not markers:
+            blocks.append(
+                line
+            )
+            continue
+
+        prefix = line[
+            : markers[0].start()
+        ].strip()
+
+        # Split when we have a real subpoint sequence (a,b,...) or when
+        # the first marker is "a." after a short title such as "AMC".
+        marker_letters = [
+            marker.group(1).lower()
+            for marker in markers
+        ]
+
+        looks_like_subpoint_list = (
+            len(markers) >= 2
+            or (
+                marker_letters[0] == "a"
+                and len(prefix) <= 60
+            )
+            or markers[0].start() == 0
+        )
+
+        if not looks_like_subpoint_list:
+            blocks.append(
+                line
+            )
+            continue
+
+        if prefix:
+            blocks.append(
+                prefix
+            )
+
+        for index, marker in enumerate(
+            markers
+        ):
+            end = (
+                markers[index + 1].start()
+                if index + 1 < len(markers)
+                else len(line)
+            )
+
+            subpoint = line[
+                marker.start() : end
+            ].strip()
+
+            if subpoint:
+                blocks.append(
+                    subpoint
+                )
+
+    return blocks
 
 
 def _term_title(
@@ -5168,14 +5205,25 @@ def _build_terms_page(
             body,
         )
 
-    # Important: no forced PageBreak here.
-    # The closing content consumes the remaining space on the final
-    # Terms page. ReportLab will create another page only when the
-    # remaining content genuinely cannot fit.
+    # Keep the complete closing section on its own final page.
+    # This guarantees that the final Authorized Signatory / BANK DETAILS
+    # page always starts with the company logo instead of allowing
+    # ReportLab to split the closing block across two pages.
+    story.append(
+        PageBreak()
+    )
+
+    story.append(
+        _logo_header(
+            data,
+            small_style,
+        )
+    )
+
     story.append(
         Spacer(
             1,
-            5 * mm,
+            8 * mm,
         )
     )
 

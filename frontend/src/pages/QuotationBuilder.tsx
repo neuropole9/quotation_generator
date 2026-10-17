@@ -22,7 +22,7 @@ import type { FullQuotationExtractedData } from "../api/fullPdfImport";
 
 import ProductEditor from "../components/ProductEditor";
 
-import QuotationPreview from "../components/QuotationPreview";
+import PdfQuotationPreview from "../components/QuotationPreview";
 
 import TermsEditor from "../components/TermsEditor";
 
@@ -2188,6 +2188,51 @@ export default function QuotationBuilder({
 
     );
 
+
+
+
+
+  const pdfData =
+
+    useMemo<QuotationData>(
+
+      () => ({
+
+        ...currentData,
+
+        products:
+
+          currentData.products.filter(
+
+            (product) =>
+
+              product.description
+
+                .trim(),
+
+          ),
+
+        abstractItems:
+
+          currentData.abstractItems.filter(
+
+            (item) =>
+
+              item.description
+
+                .trim(),
+
+          ),
+
+      }),
+
+      [
+
+        currentData,
+
+      ],
+
+    );
 
 
 
@@ -4468,15 +4513,7 @@ export default function QuotationBuilder({
 
       const validProducts =
 
-        currentData.products.filter(
-
-          (product) =>
-
-            product.description
-
-              .trim(),
-
-        );
+        pdfData.products;
 
 
 
@@ -4504,19 +4541,7 @@ export default function QuotationBuilder({
 
       const validAbstractItems =
 
-        currentData
-
-          .abstractItems
-
-          .filter(
-
-            (item) =>
-
-              item.description
-
-                .trim(),
-
-          );
+        pdfData.abstractItems;
 
 
 
@@ -4592,23 +4617,7 @@ export default function QuotationBuilder({
 
         await downloadQuotationPdf(
 
-          {
-
-            ...currentData,
-
-
-
-            products:
-
-              validProducts,
-
-
-
-            abstractItems:
-
-              validAbstractItems,
-
-          },
+          pdfData,
 
         );
 
@@ -5835,26 +5844,15 @@ export default function QuotationBuilder({
 
         <main className="preview-only-stage">
 
-          <div
-            style={{
-              width: "794px",
-              minWidth: "794px",
-              maxWidth: "none",
-              transform: "none",
-            }}
-          >
+          <PdfQuotationPreview
 
-            <QuotationPreview
+            data={
 
-              data={
+              pdfData
 
-                currentData
+            }
 
-              }
-
-            />
-
-          </div>
+          />
 
         </main>
 

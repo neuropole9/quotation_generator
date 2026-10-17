@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useMemo,
   useState,
 } from "react";
 
@@ -9,8 +8,8 @@ import type {
 } from "../types/quotation";
 
 import {
-  generateQuotationPdf,
-} from "../utils/api";
+  apiUrl,
+} from "../utils/apiBase";
 
 
 interface Props {
@@ -37,95 +36,98 @@ export default function PdfQuotationPreview({
   ] = useState("");
 
 
-  /*
-   * Use the same cleaned payload that the Download PDF
-   * action uses. This prevents blank editor rows from
-   * changing the preview PDF.
-   */
-  const pdfData =
-    useMemo<QuotationData>(
-      () => ({
-        ...data,
-
-        products:
-          Array.isArray(
-            data.products,
-          )
-            ? data.products.filter(
-                (product) =>
-                  product.description
-                    .trim(),
-              )
-            : [],
-
-        abstractItems:
-          Array.isArray(
-            data.abstractItems,
-          )
-            ? data.abstractItems.filter(
-                (item) =>
-                  item.description
-                    .trim(),
-              )
-            : [],
-      }),
-      [
-        data,
-      ],
-    );
-
-
   useEffect(
     () => {
-      let cancelled =
-        false;
-
+      let cancelled = false;
       let objectUrl = "";
 
-      const loadPdf =
-        async () => {
-          setLoading(true);
-          setError("");
-          setPdfUrl("");
+      const loadPdf = async () => {
+        setLoading(true);
+        setError("");
+        setPdfUrl("");
 
-          try {
-            const {
-              blob,
-            } =
-              await generateQuotationPdf(
-                pdfData,
-              );
-
-            if (cancelled) {
-              return;
-            }
-
-            objectUrl =
-              URL.createObjectURL(
-                blob,
-              );
-
-            setPdfUrl(
-              objectUrl,
+        try {
+          const response =
+            await fetch(
+              apiUrl(
+                "/api/quotation/pdf",
+              ),
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                },
+                body:
+                  JSON.stringify(
+                    data,
+                  ),
+              },
             );
-          } catch (err) {
-            if (cancelled) {
-              return;
+
+          if (!response.ok) {
+            let message =
+              "Unable to generate quotation PDF preview.";
+
+            try {
+              const payload =
+                await response.json();
+
+              if (
+                payload &&
+                typeof payload ===
+                  "object" &&
+                "detail" in payload
+              ) {
+                message = String(
+                  (
+                    payload as {
+                      detail?: unknown;
+                    }
+                  ).detail ??
+                    message,
+                );
+              }
+            } catch {
+              // Keep fallback message.
             }
 
-            setError(
-              err instanceof Error
-                ? err.message
-                : "Unable to generate PDF preview.",
+            throw new Error(
+              message,
             );
-          } finally {
-            if (!cancelled) {
-              setLoading(
-                false,
-              );
-            }
           }
-        };
+
+          const blob =
+            await response.blob();
+
+          if (cancelled) {
+            return;
+          }
+
+          objectUrl =
+            URL.createObjectURL(
+              blob,
+            );
+
+          setPdfUrl(
+            objectUrl,
+          );
+        } catch (err) {
+          if (cancelled) {
+            return;
+          }
+
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to generate quotation PDF preview.",
+          );
+        } finally {
+          if (!cancelled) {
+            setLoading(false);
+          }
+        }
+      };
 
       void loadPdf();
 
@@ -140,7 +142,7 @@ export default function PdfQuotationPreview({
       };
     },
     [
-      pdfData,
+      data,
     ],
   );
 
@@ -150,7 +152,7 @@ export default function PdfQuotationPreview({
       <div
         style={{
           minHeight:
-            "calc(100vh - 96px)",
+            "calc(100vh - 86px)",
           display: "grid",
           placeItems:
             "center",
@@ -198,7 +200,7 @@ export default function PdfQuotationPreview({
     >
       <iframe
         title="Quotation PDF Preview"
-        src={`${pdfUrl}#toolbar=0&navpanes=0&view=FitH`}
+        src={`${pdfUrl}#toolbar=0&navpanes=0&view=Fit`}
         style={{
           display: "block",
           width: "100%",
