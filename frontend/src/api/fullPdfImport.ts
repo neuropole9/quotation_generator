@@ -41,6 +41,10 @@ export interface FullQuotationExtractedData {
     QuotationData["quote"]
   >;
 
+  project: Partial<
+    QuotationData["project"]
+  >;
+
   abstractItems:
     QuotationAbstractLine[];
 
@@ -286,6 +290,13 @@ export async function importFullQuotationPdf(
         typeof quotation.quote ===
           "object"
           ? quotation.quote
+          : {},
+
+      project:
+        quotation.project &&
+        typeof quotation.project ===
+          "object"
+          ? quotation.project
           : {},
 
       abstractItems,
