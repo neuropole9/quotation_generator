@@ -11,6 +11,8 @@ from app.routes.saved_quotations import router as saved_quotations_router
 from app.routes.templates import router as templates_router
 from app.services.pdf_import_service import extract_products_from_pdf
 
+from app.routes.full_quotation_import import router as full_quotation_import_router
+
 
 def _allowed_origins() -> list[str]:
     origins = [
@@ -87,7 +89,7 @@ app.include_router(
     saved_quotations_router,
     prefix="/api",
 )
-
+app.include_router(full_quotation_import_router, prefix="/api")
 
 @app.get("/")
 def root():
