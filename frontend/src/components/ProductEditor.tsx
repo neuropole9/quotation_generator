@@ -1,3 +1,7 @@
+import {
+  useState,
+} from "react";
+
 import type {
   ProductLine,
   QuotationColumn,
@@ -14,6 +18,11 @@ interface Props {
   columns: QuotationColumn[];
   onChange: (products: ProductLine[]) => void;
   onColumnsChange: (columns: QuotationColumn[]) => void;
+}
+
+interface DescriptionEditorState {
+  productId: string;
+  value: string;
 }
 
 const CUSTOM_COLUMN_TYPES: Array<{
@@ -93,6 +102,13 @@ export default function ProductEditor({
   onChange,
   onColumnsChange,
 }: Props) {
+  const [
+    descriptionEditor,
+    setDescriptionEditor,
+  ] = useState<DescriptionEditorState | null>(
+    null,
+  );
+
   const safeProducts = Array.isArray(products)
     ? products
     : [];
@@ -228,6 +244,46 @@ export default function ProductEditor({
     );
   };
 
+  const openDescriptionEditor = (
+    product: ProductLine,
+  ) => {
+    setDescriptionEditor({
+      productId:
+        product.id,
+      value:
+        product.description ||
+        "",
+    });
+  };
+
+  const closeDescriptionEditor =
+    () => {
+      setDescriptionEditor(
+        null,
+      );
+    };
+
+  const saveDescriptionEditor =
+    () => {
+      if (
+        !descriptionEditor
+      ) {
+        return;
+      }
+
+      updateProduct(
+        descriptionEditor.productId,
+        {
+          description:
+            descriptionEditor.value,
+        },
+      );
+
+      setDescriptionEditor(
+        null,
+      );
+    };
+
   const renderEditorCell = (
     column: QuotationColumn,
     product: ProductLine,
@@ -267,21 +323,50 @@ export default function ProductEditor({
 
       case "description":
         return (
-          <input
-            value={
-              product.description
-            }
-            placeholder="Product / service"
-            onChange={(event) =>
-              updateProduct(
-                product.id,
-                {
-                  description:
-                    event.target.value,
-                },
+          <button
+            type="button"
+            title="Click to edit description"
+            onClick={() =>
+              openDescriptionEditor(
+                product,
               )
             }
-          />
+            style={{
+              width:
+                "100%",
+              minWidth:
+                "240px",
+              maxWidth:
+                "100%",
+              minHeight:
+                "38px",
+              padding:
+                "8px 10px",
+              border:
+                "1px solid #cbd5e1",
+              background:
+                "#ffffff",
+              color:
+                product.description
+                  ? "#0f172a"
+                  : "#94a3b8",
+              textAlign:
+                "left",
+              font:
+                "inherit",
+              cursor:
+                "text",
+              overflow:
+                "hidden",
+              textOverflow:
+                "ellipsis",
+              whiteSpace:
+                "nowrap",
+            }}
+          >
+            {product.description ||
+              "Click to enter description"}
+          </button>
         );
 
       case "unit":
@@ -706,6 +791,262 @@ export default function ProductEditor({
           </div>
         ) : null}
       </div>
+
+      {descriptionEditor ? (
+        <div
+          role="presentation"
+          onMouseDown={(event) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              closeDescriptionEditor();
+            }
+          }}
+          style={{
+            position:
+              "fixed",
+            inset: 0,
+            zIndex:
+              10000,
+            display:
+              "flex",
+            alignItems:
+              "center",
+            justifyContent:
+              "center",
+            padding:
+              "24px",
+            background:
+              "rgba(15, 23, 42, 0.48)",
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="description-editor-title"
+            style={{
+              width:
+                "min(820px, 100%)",
+              maxHeight:
+                "calc(100vh - 48px)",
+              overflowY:
+                "auto",
+              border:
+                "1px solid #cbd5e1",
+              background:
+                "#ffffff",
+              boxShadow:
+                "0 24px 70px rgba(15, 23, 42, 0.24)",
+              padding:
+                "24px",
+            }}
+          >
+            <div
+              style={{
+                display:
+                  "flex",
+                justifyContent:
+                  "space-between",
+                gap:
+                  "20px",
+                alignItems:
+                  "flex-start",
+                marginBottom:
+                  "16px",
+              }}
+            >
+              <div>
+                <h3
+                  id="description-editor-title"
+                  style={{
+                    margin: 0,
+                    color:
+                      "#0f172a",
+                    fontSize:
+                      "20px",
+                  }}
+                >
+                  Edit Description
+                </h3>
+
+                <p
+                  style={{
+                    margin:
+                      "6px 0 0",
+                    color:
+                      "#64748b",
+                    fontSize:
+                      "13px",
+                    lineHeight:
+                      1.5,
+                  }}
+                >
+                  Type or paste the full
+                  product / service description.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                aria-label="Close description editor"
+                onClick={
+                  closeDescriptionEditor
+                }
+                style={{
+                  width:
+                    "34px",
+                  height:
+                    "34px",
+                  border:
+                    "1px solid #cbd5e1",
+                  background:
+                    "#ffffff",
+                  color:
+                    "#475569",
+                  fontSize:
+                    "20px",
+                  cursor:
+                    "pointer",
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <textarea
+              autoFocus
+              value={
+                descriptionEditor.value
+              }
+              placeholder="Enter the complete description here..."
+              onChange={(event) =>
+                setDescriptionEditor(
+                  (
+                    previous,
+                  ) =>
+                    previous
+                      ? {
+                          ...previous,
+                          value:
+                            event.target
+                              .value,
+                        }
+                      : previous,
+                )
+              }
+              onKeyDown={(event) => {
+                if (
+                  event.key ===
+                  "Escape"
+                ) {
+                  closeDescriptionEditor();
+                }
+
+                if (
+                  event.key ===
+                    "Enter" &&
+                  (event.ctrlKey ||
+                    event.metaKey)
+                ) {
+                  event.preventDefault();
+                  saveDescriptionEditor();
+                }
+              }}
+              style={{
+                boxSizing:
+                  "border-box",
+                width:
+                  "100%",
+                minHeight:
+                  "280px",
+                padding:
+                  "14px",
+                border:
+                  "1px solid #94a3b8",
+                outline:
+                  "none",
+                resize:
+                  "vertical",
+                background:
+                  "#ffffff",
+                color:
+                  "#0f172a",
+                font:
+                  "inherit",
+                fontSize:
+                  "14px",
+                lineHeight:
+                  1.65,
+                whiteSpace:
+                  "pre-wrap",
+              }}
+            />
+
+            <div
+              style={{
+                display:
+                  "flex",
+                alignItems:
+                  "center",
+                justifyContent:
+                  "space-between",
+                gap:
+                  "12px",
+                marginTop:
+                  "14px",
+                flexWrap:
+                  "wrap",
+              }}
+            >
+              <span
+                style={{
+                  color:
+                    "#64748b",
+                  fontSize:
+                    "12px",
+                }}
+              >
+                {
+                  descriptionEditor
+                    .value
+                    .length
+                }{" "}
+                characters · Ctrl/Cmd + Enter to save
+              </span>
+
+              <div
+                style={{
+                  display:
+                    "flex",
+                  gap:
+                    "10px",
+                }}
+              >
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={
+                    closeDescriptionEditor
+                  }
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={
+                    saveDescriptionEditor
+                  }
+                >
+                  Save Description
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

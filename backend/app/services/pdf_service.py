@@ -324,16 +324,77 @@ def _signature_flowable(
         return None
 
     try:
-        return Image(
+        signature_image = Image(
             image_stream,
             width=40 * mm,
             height=16 * mm,
             kind="proportional",
         )
 
+        # Force the signature image itself to the left.
+        signature_image.hAlign = "LEFT"
+
+        # Wrap it in a fixed-width left-aligned table so ReportLab
+        # cannot center it within the available page width.
+        signature_table = Table(
+            [
+                [
+                    signature_image,
+                ]
+            ],
+            colWidths=[
+                48 * mm,
+            ],
+            hAlign="LEFT",
+        )
+
+        signature_table.setStyle(
+            TableStyle(
+                [
+                    (
+                        "ALIGN",
+                        (0, 0),
+                        (0, 0),
+                        "LEFT",
+                    ),
+                    (
+                        "VALIGN",
+                        (0, 0),
+                        (0, 0),
+                        "BOTTOM",
+                    ),
+                    (
+                        "LEFTPADDING",
+                        (0, 0),
+                        (-1, -1),
+                        0,
+                    ),
+                    (
+                        "RIGHTPADDING",
+                        (0, 0),
+                        (-1, -1),
+                        0,
+                    ),
+                    (
+                        "TOPPADDING",
+                        (0, 0),
+                        (-1, -1),
+                        0,
+                    ),
+                    (
+                        "BOTTOMPADDING",
+                        (0, 0),
+                        (-1, -1),
+                        0,
+                    ),
+                ]
+            )
+        )
+
+        return signature_table
+
     except Exception:
         return None
-
 
 def _is_model_column(
     column: QuotationColumn,

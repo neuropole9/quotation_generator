@@ -19,6 +19,15 @@ import QuotationPreview from "../components/QuotationPreview";
 import TermsEditor from "../components/TermsEditor";
 
 import { apiUrl } from "../utils/apiBase";
+import {
+  createQuotation,
+  deleteQuotation,
+  getQuotation,
+  listQuotations,
+  updateQuotation,
+  type QuotationSaveStatus,
+  type QuotationSummary,
+} from "../utils/api";
 
 
 
@@ -1784,6 +1793,58 @@ const resolveProductPartId = (
 };
 
 
+const formatServerDateTime = (
+  value: string,
+): string => {
+  if (!value) {
+    return "—";
+  }
+
+  /*
+   * SQLite may return UTC timestamps without a timezone suffix.
+   * When no timezone is present, treat the value as UTC by
+   * appending "Z". The browser will then display it in the
+   * user's local timezone.
+   */
+  const hasTimezone =
+    /(?:Z|[+-]\d{2}:\d{2})$/i.test(
+      value,
+    );
+
+  const normalized =
+    hasTimezone
+      ? value
+      : `${value}Z`;
+
+  const date =
+    new Date(
+      normalized,
+    );
+
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
+    return value;
+  }
+
+  return date.toLocaleString(
+    "en-IN",
+    {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    },
+  );
+};
+
+
+
 export default function QuotationBuilder({
 
   selectedTemplate,
@@ -1893,6 +1954,109 @@ export default function QuotationBuilder({
       null,
 
     );
+
+
+  const [
+
+    savedQuotationId,
+
+    setSavedQuotationId,
+
+  ] = useState<number | null>(
+
+    null,
+
+  );
+
+
+  const [
+
+    savedQuotationStatus,
+
+    setSavedQuotationStatus,
+
+  ] = useState<QuotationSaveStatus | null>(
+
+    null,
+
+  );
+
+
+  const [
+
+    savingStatus,
+
+    setSavingStatus,
+
+  ] = useState<QuotationSaveStatus | null>(
+
+    null,
+
+  );
+
+
+  const [
+
+    saveMessage,
+
+    setSaveMessage,
+
+  ] = useState("");
+
+
+  const [
+
+    showSavedQuotations,
+
+    setShowSavedQuotations,
+
+  ] = useState(false);
+
+
+  const [
+
+    savedQuotations,
+
+    setSavedQuotations,
+
+  ] = useState<QuotationSummary[]>(
+
+    [],
+
+  );
+
+
+  const [
+
+    loadingSavedQuotations,
+
+    setLoadingSavedQuotations,
+
+  ] = useState(false);
+
+
+  const [
+
+    savedQuotationSearch,
+
+    setSavedQuotationSearch,
+
+  ] = useState("");
+
+
+  const [
+
+    savedQuotationFilter,
+
+    setSavedQuotationFilter,
+
+  ] = useState<
+
+    "ALL" |
+
+    QuotationSaveStatus
+
+  >("ALL");
 
 
 
@@ -3331,6 +3495,27 @@ export default function QuotationBuilder({
       );
 
 
+      setSavedQuotationId(
+
+        null,
+
+      );
+
+
+      setSavedQuotationStatus(
+
+        null,
+
+      );
+
+
+      setSaveMessage(
+
+        "",
+
+      );
+
+
 
       setError("");
 
@@ -3355,8 +3540,599 @@ export default function QuotationBuilder({
       );
 
 
+      setSavedQuotationId(
+
+        null,
+
+      );
+
+
+      setSavedQuotationStatus(
+
+        null,
+
+      );
+
+
+      setSaveMessage(
+
+        "",
+
+      );
+
+
 
       setError("");
+
+    };
+
+
+
+
+
+  /* =======================================================
+
+     SAVED QUOTATIONS
+
+  ======================================================= */
+
+
+  const loadSavedQuotations =
+
+    async () => {
+
+      setLoadingSavedQuotations(
+
+        true,
+
+      );
+
+
+      setError(
+
+        "",
+
+      );
+
+
+      try {
+
+        const result =
+
+          await listQuotations({
+
+            limit: 500,
+
+          });
+
+
+        setSavedQuotations(
+
+          result.items,
+
+        );
+
+      } catch (err) {
+
+        setError(
+
+          err instanceof Error
+
+            ? err.message
+
+            : "Unable to load saved quotations.",
+
+        );
+
+      } finally {
+
+        setLoadingSavedQuotations(
+
+          false,
+
+        );
+
+      }
+
+    };
+
+
+  const handleOpenSavedQuotations =
+
+    async () => {
+
+      setShowPreview(
+
+        false,
+
+      );
+
+
+      setShowSavedQuotations(
+
+        true,
+
+      );
+
+
+      await loadSavedQuotations();
+
+    };
+
+
+  const loadSavedQuotationIntoEditor =
+
+    async (
+
+      quotationId: number,
+
+      openPreview = false,
+
+    ) => {
+
+      setError(
+
+        "",
+
+      );
+
+
+      try {
+
+        const saved =
+
+          await getQuotation(
+
+            quotationId,
+
+          );
+
+
+        setData(
+
+          saved.data,
+
+        );
+
+
+        onTemplateChange(
+
+          saved.data.templateId,
+
+        );
+
+
+        setSavedQuotationId(
+
+          saved.id,
+
+        );
+
+
+        setSavedQuotationStatus(
+
+          saved.status,
+
+        );
+
+
+        setSaveMessage(
+
+          `Loaded quotation record #${saved.id}.`,
+
+        );
+
+
+        setShowSavedQuotations(
+
+          false,
+
+        );
+
+
+        setShowPreview(
+
+          openPreview,
+
+        );
+
+      } catch (err) {
+
+        setError(
+
+          err instanceof Error
+
+            ? err.message
+
+            : "Unable to open quotation.",
+
+        );
+
+      }
+
+    };
+
+
+  const handleDownloadSavedQuotation =
+
+    async (
+
+      quotationId: number,
+
+    ) => {
+
+      setError(
+
+        "",
+
+      );
+
+
+      setDownloading(
+
+        true,
+
+      );
+
+
+      try {
+
+        const saved =
+
+          await getQuotation(
+
+            quotationId,
+
+          );
+
+
+        await downloadQuotationPdf(
+
+          saved.data,
+
+        );
+
+      } catch (err) {
+
+        setError(
+
+          err instanceof Error
+
+            ? err.message
+
+            : "Unable to download quotation.",
+
+        );
+
+      } finally {
+
+        setDownloading(
+
+          false,
+
+        );
+
+      }
+
+    };
+
+
+  const handleDeleteSavedQuotation =
+
+    async (
+
+      quotationId: number,
+
+    ) => {
+
+      const confirmed =
+
+        window.confirm(
+
+          "Delete this saved quotation? This action cannot be undone.",
+
+        );
+
+
+      if (!confirmed) {
+
+        return;
+
+      }
+
+
+      setError(
+
+        "",
+
+      );
+
+
+      try {
+
+        await deleteQuotation(
+
+          quotationId,
+
+        );
+
+
+        if (
+
+          savedQuotationId ===
+
+          quotationId
+
+        ) {
+
+          setSavedQuotationId(
+
+            null,
+
+          );
+
+
+          setSavedQuotationStatus(
+
+            null,
+
+          );
+
+
+          setSaveMessage(
+
+            "",
+
+          );
+
+        }
+
+
+        await loadSavedQuotations();
+
+      } catch (err) {
+
+        setError(
+
+          err instanceof Error
+
+            ? err.message
+
+            : "Unable to delete quotation.",
+
+        );
+
+      }
+
+    };
+
+
+  const filteredSavedQuotations =
+
+    useMemo(
+
+      () => {
+
+        const search =
+
+          savedQuotationSearch
+
+            .trim()
+
+            .toLowerCase();
+
+
+        return savedQuotations
+
+          .filter(
+
+            (
+
+              quotation,
+
+            ) =>
+
+              savedQuotationFilter ===
+
+                "ALL" ||
+
+              quotation.status ===
+
+                savedQuotationFilter,
+
+          )
+
+          .filter(
+
+            (
+
+              quotation,
+
+            ) => {
+
+              if (!search) {
+
+                return true;
+
+              }
+
+
+              return [
+
+                quotation.quoteNumber,
+
+                quotation.customerName,
+
+                quotation.customerCompany,
+
+                quotation.projectName,
+
+              ]
+
+                .join(" ")
+
+                .toLowerCase()
+
+                .includes(
+
+                  search,
+
+                );
+
+            },
+
+          );
+
+      },
+
+      [
+
+        savedQuotations,
+
+        savedQuotationSearch,
+
+        savedQuotationFilter,
+
+      ],
+
+    );
+
+
+
+
+
+  /* =======================================================
+
+     SAVE / UPDATE
+
+  ======================================================= */
+
+
+  const handleSaveQuotation =
+
+    async (
+
+      status:
+
+        QuotationSaveStatus,
+
+    ) => {
+
+      if (
+
+        savingStatus
+
+      ) {
+
+        return;
+
+      }
+
+
+      setError(
+
+        "",
+
+      );
+
+
+      setSaveMessage(
+
+        "",
+
+      );
+
+
+      setSavingStatus(
+
+        status,
+
+      );
+
+
+      try {
+
+        const options = {
+
+          status,
+
+          data:
+
+            currentData,
+
+        };
+
+
+        const saved =
+
+          savedQuotationId ===
+
+          null
+
+            ? await createQuotation(
+
+                options,
+
+              )
+
+            : await updateQuotation(
+
+                savedQuotationId,
+
+                options,
+
+              );
+
+
+        setSavedQuotationId(
+
+          saved.id,
+
+        );
+
+
+        setSavedQuotationStatus(
+
+          saved.status,
+
+        );
+
+
+        setSaveMessage(
+
+          status === "DRAFT"
+
+            ? `Draft saved successfully. Record #${saved.id}.`
+
+            : `Quotation saved successfully. Record #${saved.id}.`,
+
+        );
+
+      } catch (err) {
+
+        setError(
+
+          err instanceof Error
+
+            ? err.message
+
+            : status === "DRAFT"
+
+              ? "Unable to save draft."
+
+              : "Unable to save quotation.",
+
+        );
+
+      } finally {
+
+        setSavingStatus(
+
+          null,
+
+        );
+
+      }
 
     };
 
@@ -3559,6 +4335,1075 @@ export default function QuotationBuilder({
      PREVIEW SCREEN
 
   ======================================================= */
+
+
+
+  if (
+
+    showSavedQuotations
+
+  ) {
+
+    return (
+
+      <>
+
+        <header
+
+          className="topbar builder-topbar"
+
+        >
+
+          <div
+
+            className="brand-lockup"
+
+          >
+
+            <div
+
+              className="brand-mark"
+
+            >
+
+              Q
+
+            </div>
+
+
+            <div>
+
+              <strong
+
+                className="brand-name"
+
+              >
+
+                Quotation
+
+                Generator
+
+              </strong>
+
+
+              <span
+
+                className="brand-subtitle"
+
+              >
+
+                Saved Quotations
+
+              </span>
+
+            </div>
+
+          </div>
+
+
+          <div
+
+            className="builder-actions"
+
+          >
+
+            <button
+
+              type="button"
+
+              className="secondary-button"
+
+              onClick={() =>
+
+                void loadSavedQuotations()
+
+              }
+
+              disabled={
+
+                loadingSavedQuotations
+
+              }
+
+            >
+
+              {loadingSavedQuotations
+
+                ? "Refreshing..."
+
+                : "Refresh"}
+
+            </button>
+
+
+            <button
+
+              type="button"
+
+              className="primary-button"
+
+              onClick={() =>
+
+                setShowSavedQuotations(
+
+                  false,
+
+                )
+
+              }
+
+            >
+
+              Back to Editor
+
+            </button>
+
+          </div>
+
+        </header>
+
+
+        {error ? (
+
+          <div
+
+            className="global-error"
+
+          >
+
+            {error}
+
+          </div>
+
+        ) : null}
+
+
+        <main
+
+          style={{
+
+            maxWidth:
+
+              "1440px",
+
+            margin:
+
+              "0 auto",
+
+            padding:
+
+              "28px",
+
+          }}
+
+        >
+
+          <div
+
+            style={{
+
+              display:
+
+                "flex",
+
+              gap:
+
+                "12px",
+
+              alignItems:
+
+                "center",
+
+              justifyContent:
+
+                "space-between",
+
+              flexWrap:
+
+                "wrap",
+
+              marginBottom:
+
+                "18px",
+
+            }}
+
+          >
+
+            <div>
+
+              <h1
+
+                style={{
+
+                  margin: 0,
+
+                  fontSize:
+
+                    "26px",
+
+                  color:
+
+                    "#0f172a",
+
+                }}
+
+              >
+
+                Saved Quotations
+
+              </h1>
+
+
+              <p
+
+                style={{
+
+                  margin:
+
+                    "6px 0 0",
+
+                  color:
+
+                    "#64748b",
+
+                  fontSize:
+
+                    "14px",
+
+                }}
+
+              >
+
+                Open, edit, preview,
+
+                download or delete
+
+                saved quotations.
+
+              </p>
+
+            </div>
+
+
+            <div
+
+              style={{
+
+                display:
+
+                  "flex",
+
+                gap:
+
+                  "10px",
+
+                flexWrap:
+
+                  "wrap",
+
+              }}
+
+            >
+
+              <input
+
+                type="search"
+
+                value={
+
+                  savedQuotationSearch
+
+                }
+
+                placeholder="Search quotation, customer or project"
+
+                onChange={(
+
+                  event,
+
+                ) =>
+
+                  setSavedQuotationSearch(
+
+                    event.target
+
+                      .value,
+
+                  )
+
+                }
+
+                style={{
+
+                  width:
+
+                    "310px",
+
+                  maxWidth:
+
+                    "100%",
+
+                  padding:
+
+                    "10px 12px",
+
+                  border:
+
+                    "1px solid #cbd5e1",
+
+                  background:
+
+                    "#ffffff",
+
+                }}
+
+              />
+
+
+              <select
+
+                value={
+
+                  savedQuotationFilter
+
+                }
+
+                onChange={(
+
+                  event,
+
+                ) =>
+
+                  setSavedQuotationFilter(
+
+                    event.target
+
+                      .value as
+
+                      | "ALL"
+
+                      | QuotationSaveStatus,
+
+                  )
+
+                }
+
+                style={{
+
+                  padding:
+
+                    "10px 12px",
+
+                  border:
+
+                    "1px solid #cbd5e1",
+
+                  background:
+
+                    "#ffffff",
+
+                }}
+
+              >
+
+                <option
+
+                  value="ALL"
+
+                >
+
+                  All Statuses
+
+                </option>
+
+                <option
+
+                  value="DRAFT"
+
+                >
+
+                  Draft
+
+                </option>
+
+                <option
+
+                  value="SAVED"
+
+                >
+
+                  Saved
+
+                </option>
+
+              </select>
+
+            </div>
+
+          </div>
+
+
+          <div
+
+            style={{
+
+              border:
+
+                "1px solid #e2e8f0",
+
+              background:
+
+                "#ffffff",
+
+              overflowX:
+
+                "auto",
+
+            }}
+
+          >
+
+            <table
+
+              style={{
+
+                width:
+
+                  "100%",
+
+                borderCollapse:
+
+                  "collapse",
+
+                minWidth:
+
+                  "1050px",
+
+              }}
+
+            >
+
+              <thead>
+
+                <tr
+
+                  style={{
+
+                    background:
+
+                      "#f8fafc",
+
+                    borderBottom:
+
+                      "1px solid #e2e8f0",
+
+                  }}
+
+                >
+
+                  {[
+
+                    "Quote No.",
+
+                    "Customer",
+
+                    "Project",
+
+                    "Date",
+
+                    "Status",
+
+                    "Last Updated",
+
+                    "Actions",
+
+                  ].map(
+
+                    (
+
+                      heading,
+
+                    ) => (
+
+                      <th
+
+                        key={
+
+                          heading
+
+                        }
+
+                        style={{
+
+                          padding:
+
+                            "12px 14px",
+
+                          textAlign:
+
+                            "left",
+
+                          fontSize:
+
+                            "12px",
+
+                          color:
+
+                            "#475569",
+
+                          letterSpacing:
+
+                            "0.04em",
+
+                          textTransform:
+
+                            "uppercase",
+
+                        }}
+
+                      >
+
+                        {heading}
+
+                      </th>
+
+                    ),
+
+                  )}
+
+                </tr>
+
+              </thead>
+
+
+              <tbody>
+
+                {loadingSavedQuotations ? (
+
+                  <tr>
+
+                    <td
+
+                      colSpan={
+
+                        7
+
+                      }
+
+                      style={{
+
+                        padding:
+
+                          "34px",
+
+                        textAlign:
+
+                          "center",
+
+                        color:
+
+                          "#64748b",
+
+                      }}
+
+                    >
+
+                      Loading saved quotations...
+
+                    </td>
+
+                  </tr>
+
+                ) : filteredSavedQuotations
+
+                    .length === 0 ? (
+
+                  <tr>
+
+                    <td
+
+                      colSpan={
+
+                        7
+
+                      }
+
+                      style={{
+
+                        padding:
+
+                          "34px",
+
+                        textAlign:
+
+                          "center",
+
+                        color:
+
+                          "#64748b",
+
+                      }}
+
+                    >
+
+                      No saved quotations found.
+
+                    </td>
+
+                  </tr>
+
+                ) : (
+
+                  filteredSavedQuotations.map(
+
+                    (
+
+                      quotation,
+
+                    ) => (
+
+                      <tr
+
+                        key={
+
+                          quotation.id
+
+                        }
+
+                        style={{
+
+                          borderBottom:
+
+                            "1px solid #e2e8f0",
+
+                        }}
+
+                      >
+
+                        <td
+
+                          style={{
+
+                            padding:
+
+                              "14px",
+
+                            fontWeight:
+
+                              600,
+
+                            color:
+
+                              "#0f172a",
+
+                          }}
+
+                        >
+
+                          {quotation
+
+                            .quoteNumber ||
+
+                            `Draft #${quotation.id}`}
+
+                        </td>
+
+
+                        <td
+
+                          style={{
+
+                            padding:
+
+                              "14px",
+
+                            color:
+
+                              "#334155",
+
+                          }}
+
+                        >
+
+                          <div>
+
+                            {quotation
+
+                              .customerCompany ||
+
+                              quotation
+
+                                .customerName ||
+
+                              "—"}
+
+                          </div>
+
+
+                          {quotation
+
+                            .customerCompany &&
+
+                          quotation
+
+                            .customerName ? (
+
+                            <div
+
+                              style={{
+
+                                marginTop:
+
+                                  "3px",
+
+                                color:
+
+                                  "#64748b",
+
+                                fontSize:
+
+                                  "12px",
+
+                              }}
+
+                            >
+
+                              {quotation
+
+                                .customerName}
+
+                            </div>
+
+                          ) : null}
+
+                        </td>
+
+
+                        <td
+
+                          style={{
+
+                            padding:
+
+                              "14px",
+
+                            color:
+
+                              "#334155",
+
+                          }}
+
+                        >
+
+                          {quotation
+
+                            .projectName ||
+
+                            "—"}
+
+                        </td>
+
+
+                        <td
+
+                          style={{
+
+                            padding:
+
+                              "14px",
+
+                            color:
+
+                              "#334155",
+
+                          }}
+
+                        >
+
+                          {quotation
+
+                            .quoteDate ||
+
+                            "—"}
+
+                        </td>
+
+
+                        <td
+
+                          style={{
+
+                            padding:
+
+                              "14px",
+
+                          }}
+
+                        >
+
+                          <span
+
+                            style={{
+
+                              display:
+
+                                "inline-block",
+
+                              padding:
+
+                                "5px 8px",
+
+                              border:
+
+                                quotation.status ===
+
+                                "SAVED"
+
+                                  ? "1px solid #86efac"
+
+                                  : "1px solid #fde68a",
+
+                              background:
+
+                                quotation.status ===
+
+                                "SAVED"
+
+                                  ? "#f0fdf4"
+
+                                  : "#fffbeb",
+
+                              color:
+
+                                quotation.status ===
+
+                                "SAVED"
+
+                                  ? "#166534"
+
+                                  : "#92400e",
+
+                              fontSize:
+
+                                "11px",
+
+                              fontWeight:
+
+                                700,
+
+                            }}
+
+                          >
+
+                            {quotation.status}
+
+                          </span>
+
+                        </td>
+
+
+                        <td
+
+                          style={{
+
+                            padding:
+
+                              "14px",
+
+                            color:
+
+                              "#64748b",
+
+                            fontSize:
+
+                              "13px",
+
+                          }}
+
+                        >
+
+                          {formatServerDateTime(
+
+                            quotation.updatedAt,
+
+                          )}
+
+                        </td>
+
+
+                        <td
+
+                          style={{
+
+                            padding:
+
+                              "14px",
+
+                          }}
+
+                        >
+
+                          <div
+
+                            style={{
+
+                              display:
+
+                                "flex",
+
+                              gap:
+
+                                "7px",
+
+                              flexWrap:
+
+                                "wrap",
+
+                            }}
+
+                          >
+
+                            <button
+
+                              type="button"
+
+                              className="secondary-button"
+
+                              onClick={() =>
+
+                                void loadSavedQuotationIntoEditor(
+
+                                  quotation.id,
+
+                                  false,
+
+                                )
+
+                              }
+
+                            >
+
+                              Edit
+
+                            </button>
+
+
+                            <button
+
+                              type="button"
+
+                              className="secondary-button"
+
+                              onClick={() =>
+
+                                void loadSavedQuotationIntoEditor(
+
+                                  quotation.id,
+
+                                  true,
+
+                                )
+
+                              }
+
+                            >
+
+                              Preview
+
+                            </button>
+
+
+                            <button
+
+                              type="button"
+
+                              className="secondary-button"
+
+                              disabled={
+
+                                downloading
+
+                              }
+
+                              onClick={() =>
+
+                                void handleDownloadSavedQuotation(
+
+                                  quotation.id,
+
+                                )
+
+                              }
+
+                            >
+
+                              PDF
+
+                            </button>
+
+
+                            <button
+
+                              type="button"
+
+                              className="secondary-button"
+
+                              onClick={() =>
+
+                                void handleDeleteSavedQuotation(
+
+                                  quotation.id,
+
+                                )
+
+                              }
+
+                              style={{
+
+                                color:
+
+                                  "#b91c1c",
+
+                                borderColor:
+
+                                  "#fecaca",
+
+                              }}
+
+                            >
+
+                              Delete
+
+                            </button>
+
+                          </div>
+
+                        </td>
+
+                      </tr>
+
+                    ),
+
+                  )
+
+                )}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </main>
+
+      </>
+
+    );
+
+  }
+
+
 
 
 
@@ -3912,6 +5757,121 @@ export default function QuotationBuilder({
 
             className="secondary-button"
 
+            onClick={() =>
+
+              void handleOpenSavedQuotations()
+
+            }
+
+          >
+
+            Saved Quotations
+
+          </button>
+
+
+          {savedQuotationStatus !==
+
+          "SAVED" ? (
+
+            <button
+
+              type="button"
+
+              className="secondary-button"
+
+              disabled={
+
+                savingStatus !==
+
+                null
+
+              }
+
+              onClick={() =>
+
+                void handleSaveQuotation(
+
+                  "DRAFT",
+
+                )
+
+              }
+
+            >
+
+              {savingStatus ===
+
+              "DRAFT"
+
+                ? "Saving Draft..."
+
+                : savedQuotationId !==
+
+                    null &&
+
+                  savedQuotationStatus ===
+
+                    "DRAFT"
+
+                  ? "Update Draft"
+
+                  : "Save Draft"}
+
+            </button>
+
+          ) : null}
+
+
+          <button
+
+            type="button"
+
+            className="secondary-button"
+
+            disabled={
+
+              savingStatus !==
+
+              null
+
+            }
+
+            onClick={() =>
+
+              void handleSaveQuotation(
+
+                "SAVED",
+
+              )
+
+            }
+
+          >
+
+            {savingStatus ===
+
+            "SAVED"
+
+              ? "Saving..."
+
+              : savedQuotationId !==
+
+                  null
+
+                ? "Update Quotation"
+
+                : "Save Quotation"}
+
+          </button>
+
+
+          <button
+
+            type="button"
+
+            className="secondary-button"
+
             onClick={() => {
 
               setError(
@@ -3979,6 +5939,82 @@ export default function QuotationBuilder({
         <div className="global-error">
 
           {error}
+
+        </div>
+
+      ) : null}
+
+
+      {saveMessage ? (
+
+        <div
+
+          role="status"
+
+          style={{
+
+            maxWidth:
+
+              "1440px",
+
+            margin:
+
+              "12px auto 0",
+
+            padding:
+
+              "10px 14px",
+
+            border:
+
+              "1px solid #cbd5e1",
+
+            background:
+
+              "#f8fafc",
+
+            color:
+
+              "#0f172a",
+
+            fontSize:
+
+              "13px",
+
+          }}
+
+        >
+
+          {saveMessage}
+
+
+          {savedQuotationId !==
+
+          null ? (
+
+            <span
+
+              style={{
+
+                marginLeft:
+
+                  "8px",
+
+                color:
+
+                  "#64748b",
+
+              }}
+
+            >
+
+              Status:{" "}
+
+              {savedQuotationStatus}
+
+            </span>
+
+          ) : null}
 
         </div>
 
