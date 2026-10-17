@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session
 
+from app.auth.clerk_auth import (
+    get_current_user,
+    get_user_display_name,
+    get_user_primary_email,
+    is_admin_user,
+)
 from app.db import get_db
 from app.models.quotation import QuotationData
 from app.models.saved_quotation import SavedQuotation
@@ -28,18 +34,27 @@ QuotationStatus = Literal[
 class SaveQuotationRequest(BaseModel):
     status: QuotationStatus = "DRAFT"
     data: QuotationData
+
+    # Kept only for backward compatibility with the existing frontend payload.
+    # The backend intentionally ignores this value and always derives ownership
+    # from the authenticated Clerk session.
     ownerUserId: str | None = None
 
 
 class QuotationSummaryResponse(BaseModel):
     id: int
     status: QuotationStatus
+
     quoteNumber: str
     customerName: str
     customerCompany: str
     projectName: str
     quoteDate: str
+
     ownerUserId: str | None = None
+    createdByName: str | None = None
+    createdByEmail: str | None = None
+
     createdAt: datetime
     updatedAt: datetime
 
@@ -70,6 +85,28 @@ def _clean(
     return str(
         value or ""
     ).strip()
+
+
+def _current_user_id(
+    current_user: dict[str, Any],
+) -> str:
+    user_id = _clean(
+        current_user.get(
+            "id"
+        )
+    )
+
+    if not user_id:
+        raise HTTPException(
+            status_code=
+                status.HTTP_401_UNAUTHORIZED,
+            detail=(
+                "Authenticated user "
+                "identifier is missing."
+            ),
+        )
+
+    return user_id
 
 
 def _extract_search_fields(
@@ -178,17 +215,31 @@ def _summary(
         id=record.id,
         status=record.status,
         quoteNumber=
-            record.quote_number,
+            _clean(
+                record.quote_number
+            ),
         customerName=
-            record.customer_name,
+            _clean(
+                record.customer_name
+            ),
         customerCompany=
-            record.customer_company,
+            _clean(
+                record.customer_company
+            ),
         projectName=
-            record.project_name,
+            _clean(
+                record.project_name
+            ),
         quoteDate=
-            record.quote_date,
+            _clean(
+                record.quote_date
+            ),
         ownerUserId=
             record.owner_user_id,
+        createdByName=
+            record.created_by_name,
+        createdByEmail=
+            record.created_by_email,
         createdAt=
             record.created_at,
         updatedAt=
@@ -245,6 +296,42 @@ def _get_record(
     return record
 
 
+def _get_accessible_record(
+    quotation_id: int,
+    db: Session,
+    current_user: dict[str, Any],
+) -> SavedQuotation:
+    record = _get_record(
+        quotation_id,
+        db,
+    )
+
+    if is_admin_user(
+        current_user
+    ):
+        return record
+
+    user_id = _current_user_id(
+        current_user
+    )
+
+    if (
+        not record.owner_user_id
+        or record.owner_user_id
+        != user_id
+    ):
+        # Return 404 instead of 403 so a normal user cannot
+        # discover whether another user's quotation ID exists.
+        raise HTTPException(
+            status_code=
+                status.HTTP_404_NOT_FOUND,
+            detail=
+                "Quotation not found.",
+        )
+
+    return record
+
+
 @router.post(
     "",
     response_model=
@@ -256,6 +343,9 @@ def create_quotation(
     payload: SaveQuotationRequest,
     db: Session = Depends(
         get_db
+    ),
+    current_user: dict[str, Any] = Depends(
+        get_current_user
     ),
 ):
     if payload.status == "SAVED":
@@ -269,12 +359,33 @@ def create_quotation(
         )
     )
 
+    owner_user_id = (
+        _current_user_id(
+            current_user
+        )
+    )
+
+    creator_name = (
+        get_user_display_name(
+            current_user
+        )
+    )
+
+    creator_email = (
+        get_user_primary_email(
+            current_user
+        )
+    )
+
     record = SavedQuotation(
         status=payload.status,
         owner_user_id=
-            _clean(
-                payload.ownerUserId
-            )
+            owner_user_id,
+        created_by_name=
+            creator_name
+            or None,
+        created_by_email=
+            creator_email
             or None,
         quotation_data=
             payload.data.model_dump(
@@ -302,7 +413,8 @@ def list_quotations(
         default=None,
         description=(
             "Search quotation number, "
-            "customer, company or project."
+            "customer, company, project "
+            "or creator."
         ),
     ),
     quotation_status:
@@ -318,10 +430,28 @@ def list_quotations(
     db: Session = Depends(
         get_db
     ),
+    current_user: dict[str, Any] = Depends(
+        get_current_user
+    ),
 ):
     statement = select(
         SavedQuotation
     )
+
+    # Normal users can see only quotations they originally created.
+    # Admin/Super Admin can see quotations created by everyone.
+    if not is_admin_user(
+        current_user
+    ):
+        statement = (
+            statement.where(
+                SavedQuotation
+                .owner_user_id
+                == _current_user_id(
+                    current_user
+                )
+            )
+        )
 
     if quotation_status:
         statement = (
@@ -340,21 +470,40 @@ def list_quotations(
             f"%{search_text}%"
         )
 
+        search_filters = [
+            SavedQuotation
+            .quote_number
+            .ilike(pattern),
+            SavedQuotation
+            .customer_name
+            .ilike(pattern),
+            SavedQuotation
+            .customer_company
+            .ilike(pattern),
+            SavedQuotation
+            .project_name
+            .ilike(pattern),
+        ]
+
+        # Creator search is particularly useful to Admin.
+        if is_admin_user(
+            current_user
+        ):
+            search_filters.extend(
+                [
+                    SavedQuotation
+                    .created_by_name
+                    .ilike(pattern),
+                    SavedQuotation
+                    .created_by_email
+                    .ilike(pattern),
+                ]
+            )
+
         statement = (
             statement.where(
                 or_(
-                    SavedQuotation
-                    .quote_number
-                    .ilike(pattern),
-                    SavedQuotation
-                    .customer_name
-                    .ilike(pattern),
-                    SavedQuotation
-                    .customer_company
-                    .ilike(pattern),
-                    SavedQuotation
-                    .project_name
-                    .ilike(pattern),
+                    *search_filters
                 )
             )
         )
@@ -397,11 +546,15 @@ def get_quotation(
     db: Session = Depends(
         get_db
     ),
+    current_user: dict[str, Any] = Depends(
+        get_current_user
+    ),
 ):
     return _detail(
-        _get_record(
+        _get_accessible_record(
             quotation_id,
             db,
+            current_user,
         )
     )
 
@@ -417,10 +570,16 @@ def update_quotation(
     db: Session = Depends(
         get_db
     ),
+    current_user: dict[str, Any] = Depends(
+        get_current_user
+    ),
 ):
-    record = _get_record(
-        quotation_id,
-        db,
+    record = (
+        _get_accessible_record(
+            quotation_id,
+            db,
+            current_user,
+        )
     )
 
     if payload.status == "SAVED":
@@ -438,13 +597,9 @@ def update_quotation(
         payload.status
     )
 
-    record.owner_user_id = (
-        _clean(
-            payload.ownerUserId
-        )
-        or record.owner_user_id
-    )
-
+    # Ownership and creator identity intentionally never change here.
+    # If an Admin edits another user's quotation, the original creator
+    # remains visible as the creator.
     record.quotation_data = (
         payload.data.model_dump(
             mode="json"
@@ -506,10 +661,16 @@ def delete_quotation(
     db: Session = Depends(
         get_db
     ),
+    current_user: dict[str, Any] = Depends(
+        get_current_user
+    ),
 ):
-    record = _get_record(
-        quotation_id,
-        db,
+    record = (
+        _get_accessible_record(
+            quotation_id,
+            db,
+            current_user,
+        )
     )
 
     db.delete(record)

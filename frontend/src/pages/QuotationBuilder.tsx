@@ -1,4 +1,9 @@
 import {
+  useAuth,
+} from "@clerk/react";
+
+
+import {
 
   useMemo,
 
@@ -1855,6 +1860,46 @@ export default function QuotationBuilder({
 
 }: Props) {
 
+  const {
+    getToken,
+    isLoaded:
+      isAuthLoaded,
+    isSignedIn,
+  } = useAuth();
+
+
+  const getRequiredQuotationToken =
+    async () => {
+
+      if (!isAuthLoaded) {
+        throw new Error(
+          "Authentication is still loading. Please try again.",
+        );
+      }
+
+
+      if (!isSignedIn) {
+        throw new Error(
+          "Authentication required. Please sign in again.",
+        );
+      }
+
+
+      const token =
+        await getToken();
+
+
+      if (!token) {
+        throw new Error(
+          "Unable to get the Clerk session token. Please sign in again.",
+        );
+      }
+
+
+      return token;
+    };
+
+
   const [
 
     data,
@@ -3597,13 +3642,24 @@ export default function QuotationBuilder({
 
       try {
 
+        const token =
+
+          await getRequiredQuotationToken();
+
+
         const result =
 
-          await listQuotations({
+          await listQuotations(
 
-            limit: 500,
+            {
 
-          });
+              limit: 500,
+
+            },
+
+            token,
+
+          );
 
 
         setSavedQuotations(
@@ -3679,11 +3735,18 @@ export default function QuotationBuilder({
 
       try {
 
+        const token =
+
+          await getRequiredQuotationToken();
+
+
         const saved =
 
           await getQuotation(
 
             quotationId,
+
+            token,
 
           );
 
@@ -3777,11 +3840,18 @@ export default function QuotationBuilder({
 
       try {
 
+        const token =
+
+          await getRequiredQuotationToken();
+
+
         const saved =
 
           await getQuotation(
 
             quotationId,
+
+            token,
 
           );
 
@@ -3850,9 +3920,16 @@ export default function QuotationBuilder({
 
       try {
 
+        const token =
+
+          await getRequiredQuotationToken();
+
+
         await deleteQuotation(
 
           quotationId,
+
+          token,
 
         );
 
@@ -4052,6 +4129,11 @@ export default function QuotationBuilder({
 
       try {
 
+        const token =
+
+          await getRequiredQuotationToken();
+
+
         const options = {
 
           status,
@@ -4073,6 +4155,8 @@ export default function QuotationBuilder({
 
                 options,
 
+                token,
+
               )
 
             : await updateQuotation(
@@ -4080,6 +4164,8 @@ export default function QuotationBuilder({
                 savedQuotationId,
 
                 options,
+
+                token,
 
               );
 
@@ -4616,7 +4702,7 @@ export default function QuotationBuilder({
 
                 }
 
-                placeholder="Search quotation, customer or project"
+                placeholder="Search quotation, project or creator"
 
                 onChange={(
 
@@ -4778,7 +4864,7 @@ export default function QuotationBuilder({
 
                 minWidth:
 
-                  "1050px",
+                  "1020px",
 
               }}
 
@@ -4806,9 +4892,9 @@ export default function QuotationBuilder({
 
                     "Quote No.",
 
-                    "Customer",
-
                     "Project",
+
+                    "Created By",
 
                     "Date",
 
@@ -5026,15 +5112,40 @@ export default function QuotationBuilder({
 
                         >
 
+                          {quotation
+
+                            .projectName ||
+
+                            "—"}
+
+                        </td>
+
+
+                        <td
+
+                          style={{
+
+                            padding:
+
+                              "14px",
+
+                            color:
+
+                              "#334155",
+
+                          }}
+
+                        >
+
                           <div>
 
                             {quotation
 
-                              .customerCompany ||
+                              .createdByName ||
 
                               quotation
 
-                                .customerName ||
+                                .createdByEmail ||
 
                               "—"}
 
@@ -5043,11 +5154,11 @@ export default function QuotationBuilder({
 
                           {quotation
 
-                            .customerCompany &&
+                            .createdByName &&
 
                           quotation
 
-                            .customerName ? (
+                            .createdByEmail ? (
 
                             <div
 
@@ -5071,36 +5182,11 @@ export default function QuotationBuilder({
 
                               {quotation
 
-                                .customerName}
+                                .createdByEmail}
 
                             </div>
 
                           ) : null}
-
-                        </td>
-
-
-                        <td
-
-                          style={{
-
-                            padding:
-
-                              "14px",
-
-                            color:
-
-                              "#334155",
-
-                          }}
-
-                        >
-
-                          {quotation
-
-                            .projectName ||
-
-                            "—"}
 
                         </td>
 
@@ -5525,15 +5611,26 @@ export default function QuotationBuilder({
 
         <main className="preview-only-stage">
 
-          <QuotationPreview
+          <div
+            style={{
+              width: "794px",
+              minWidth: "794px",
+              maxWidth: "none",
+              transform: "none",
+            }}
+          >
 
-            data={
+            <QuotationPreview
 
-              currentData
+              data={
 
-            }
+                currentData
 
-          />
+              }
+
+            />
+
+          </div>
 
         </main>
 

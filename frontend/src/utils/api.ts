@@ -184,6 +184,12 @@ export interface QuotationSummary {
   ownerUserId:
     | string
     | null;
+  createdByName:
+    | string
+    | null;
+  createdByEmail:
+    | string
+    | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -207,9 +213,6 @@ export interface SaveQuotationOptions {
     QuotationSaveStatus;
   data:
     QuotationData;
-  ownerUserId?:
-    | string
-    | null;
 }
 
 
@@ -222,12 +225,71 @@ export interface ListQuotationsOptions {
 
 
 /* =========================================================
+   AUTHENTICATED QUOTATION REQUESTS
+========================================================= */
+
+export type ClerkSessionToken =
+  | string
+  | null
+  | undefined;
+
+
+function authenticatedJsonHeaders(
+  token:
+    ClerkSessionToken,
+): HeadersInit {
+  const cleanToken =
+    token?.trim();
+
+
+  if (!cleanToken) {
+    throw new Error(
+      "Authentication required. Please sign in again.",
+    );
+  }
+
+
+  return {
+    "Content-Type":
+      "application/json",
+
+    Authorization:
+      `Bearer ${cleanToken}`,
+  };
+}
+
+
+function authenticatedHeaders(
+  token:
+    ClerkSessionToken,
+): HeadersInit {
+  const cleanToken =
+    token?.trim();
+
+
+  if (!cleanToken) {
+    throw new Error(
+      "Authentication required. Please sign in again.",
+    );
+  }
+
+
+  return {
+    Authorization:
+      `Bearer ${cleanToken}`,
+  };
+}
+
+
+/* =========================================================
    CREATE
 ========================================================= */
 
 export async function createQuotation(
   options:
     SaveQuotationOptions,
+  token?:
+    ClerkSessionToken,
 ): Promise<SavedQuotation> {
   const response =
     await fetch(
@@ -238,10 +300,10 @@ export async function createQuotation(
         method:
           "POST",
 
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
+        headers:
+          authenticatedJsonHeaders(
+            token,
+          ),
 
         body:
           JSON.stringify({
@@ -250,10 +312,6 @@ export async function createQuotation(
 
             data:
               options.data,
-
-            ownerUserId:
-              options.ownerUserId ??
-              null,
           }),
       },
     );
@@ -283,6 +341,8 @@ export async function listQuotations(
   options:
     ListQuotationsOptions =
       {},
+  token?:
+    ClerkSessionToken,
 ): Promise<QuotationListResponse> {
   const params =
     new URLSearchParams();
@@ -333,6 +393,12 @@ export async function listQuotations(
           ? `/api/quotations?${query}`
           : "/api/quotations",
       ),
+      {
+        headers:
+          authenticatedHeaders(
+            token,
+          ),
+      },
     );
 
 
@@ -358,12 +424,20 @@ export async function listQuotations(
 
 export async function getQuotation(
   quotationId: number,
+  token?:
+    ClerkSessionToken,
 ): Promise<SavedQuotation> {
   const response =
     await fetch(
       apiUrl(
         `/api/quotations/${quotationId}`,
       ),
+      {
+        headers:
+          authenticatedHeaders(
+            token,
+          ),
+      },
     );
 
 
@@ -391,6 +465,8 @@ export async function updateQuotation(
   quotationId: number,
   options:
     SaveQuotationOptions,
+  token?:
+    ClerkSessionToken,
 ): Promise<SavedQuotation> {
   const response =
     await fetch(
@@ -401,10 +477,10 @@ export async function updateQuotation(
         method:
           "PUT",
 
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
+        headers:
+          authenticatedJsonHeaders(
+            token,
+          ),
 
         body:
           JSON.stringify({
@@ -413,10 +489,6 @@ export async function updateQuotation(
 
             data:
               options.data,
-
-            ownerUserId:
-              options.ownerUserId ??
-              null,
           }),
       },
     );
@@ -444,6 +516,8 @@ export async function updateQuotation(
 
 export async function deleteQuotation(
   quotationId: number,
+  token?:
+    ClerkSessionToken,
 ): Promise<void> {
   const response =
     await fetch(
@@ -453,6 +527,11 @@ export async function deleteQuotation(
       {
         method:
           "DELETE",
+
+        headers:
+          authenticatedHeaders(
+            token,
+          ),
       },
     );
 
