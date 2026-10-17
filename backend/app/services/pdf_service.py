@@ -5205,25 +5205,14 @@ def _build_terms_page(
             body,
         )
 
-    # Keep the complete closing section on its own final page.
-    # This guarantees that the final Authorized Signatory / BANK DETAILS
-    # page always starts with the company logo instead of allowing
-    # ReportLab to split the closing block across two pages.
-    story.append(
-        PageBreak()
-    )
-
-    story.append(
-        _logo_header(
-            data,
-            small_style,
-        )
-    )
-
+    # Continue directly with the closing section after the final term.
+    # Do not force a new page here; use the remaining space on the
+    # current Terms page first. ReportLab will move only the content
+    # that genuinely does not fit to the next physical page.
     story.append(
         Spacer(
             1,
-            8 * mm,
+            5 * mm,
         )
     )
 
