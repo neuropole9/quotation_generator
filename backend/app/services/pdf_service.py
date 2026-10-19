@@ -1375,22 +1375,62 @@ def _build_abstract_page(
         in data.abstractItems
     )
 
-    abstract_rows.append(
+    abstract_gst = (
+        abstract_total
+        * GLOBAL_GST_RATE
+        / 100
+    )
+    abstract_total_including_gst = (
+        abstract_total
+        + abstract_gst
+    )
+
+    abstract_rows.extend(
         [
-            Paragraph(
-                "<b>Total Amount</b>",
-                body_right,
-            ),
-            "",
-            "",
-            Paragraph(
-                (
-                    "<b>"
-                    f"{plain_amount(abstract_total)}"
-                    "</b>"
+            [
+                Paragraph(
+                    "<b>Total Amount (Excl. GST)</b>",
+                    body_right,
                 ),
-                body_right,
-            ),
+                "",
+                "",
+                Paragraph(
+                    (
+                        "<b>"
+                        f"{plain_amount(abstract_total)}"
+                        "</b>"
+                    ),
+                    body_right,
+                ),
+            ],
+            [
+                Paragraph(
+                    f"GST @ {GLOBAL_GST_RATE:g}%",
+                    body_right,
+                ),
+                "",
+                "",
+                Paragraph(
+                    plain_amount(abstract_gst),
+                    body_right,
+                ),
+            ],
+            [
+                Paragraph(
+                    "<b>Total Amount (Incl. GST)</b>",
+                    body_right,
+                ),
+                "",
+                "",
+                Paragraph(
+                    (
+                        "<b>"
+                        f"{plain_amount(abstract_total_including_gst)}"
+                        "</b>"
+                    ),
+                    body_right,
+                ),
+            ],
         ]
     )
 
@@ -1419,16 +1459,51 @@ def _build_abstract_page(
                 (
                     "INNERGRID",
                     (0, 0),
-                    (-1, -2),
+                    (-1, -4),
                     0.6,
                     MID_GRAY,
                 ),
+                # Strong separator between the item rows and totals.
                 (
                     "LINEABOVE",
-                    (0, -1),
-                    (-1, -1),
+                    (0, -3),
+                    (-1, -3),
                     0.8,
                     BLACK,
+                ),
+                # Separate Excl. GST from the GST row.
+                (
+                    "LINEBELOW",
+                    (0, -3),
+                    (-1, -3),
+                    0.65,
+                    MID_GRAY,
+                ),
+                # Separate the GST row from the final Incl. GST total.
+                (
+                    "LINEBELOW",
+                    (0, -2),
+                    (-1, -2),
+                    0.8,
+                    BLACK,
+                ),
+                # Keep a visible divider between the total label and amount.
+                (
+                    "LINEBEFORE",
+                    (3, -3),
+                    (3, -1),
+                    0.65,
+                    MID_GRAY,
+                ),
+                (
+                    "SPAN",
+                    (0, -3),
+                    (2, -3),
+                ),
+                (
+                    "SPAN",
+                    (0, -2),
+                    (2, -2),
                 ),
                 (
                     "SPAN",
@@ -1437,7 +1512,7 @@ def _build_abstract_page(
                 ),
                 (
                     "ALIGN",
-                    (0, -1),
+                    (0, -3),
                     (2, -1),
                     "RIGHT",
                 ),
@@ -1500,18 +1575,6 @@ def _build_abstract_page(
         Spacer(
             1,
             1.5 * mm,
-        )
-    )
-
-    story.append(
-        Paragraph(
-            "<b>Excluding GST</b>",
-            ParagraphStyle(
-                "abstract_gst_note",
-                parent=body_right,
-                fontSize=7.5,
-                leading=9,
-            ),
         )
     )
 
@@ -4461,6 +4524,25 @@ def _term_block_flowables(
 def _flowable_total_height(
     flowable,
 ) -> float:
+    # KeepTogether.wrap() expects ReportLab to have already attached
+    # a canvas. This helper is also used before document build time,
+    # so measuring KeepTogether directly can raise:
+    #   AttributeError: 'KeepTogether' object has no attribute 'canv'
+    # Measure its child flowables instead.
+    if isinstance(flowable, KeepTogether):
+        content = getattr(
+            flowable,
+            "_content",
+            None,
+        )
+
+        if content:
+            return _flowables_height(
+                list(content)
+            )
+
+        return 0.0
+
     _, height = flowable.wrap(
         CONTENT_WIDTH,
         USABLE_FRAME_HEIGHT,
@@ -4721,11 +4803,15 @@ def _append_legacy_terms_content(
         )
 
 
-def _append_terms_closing_details(
-    story: list,
+def _terms_closing_sections(
     data: QuotationData,
     body: ParagraphStyle,
-):
+) -> list[list]:
+    """Build the closing section as measured chunks.
+
+    The chunks let the final Terms page use its remaining space while
+    ensuring that any continuation page starts with the company logo.
+    """
     closing_style = ParagraphStyle(
         "terms_closing_note",
         parent=body,
@@ -4736,67 +4822,81 @@ def _append_terms_closing_details(
         spaceAfter=7,
     )
 
-    story.append(
+    offer_section = [
         Paragraph(
             safe_text(
                 "We hope you will find our offer quite competitive and in line with your requirements and request you to favor us with your value order."
             ),
             closing_style,
-        )
-    )
+        ),
+        Spacer(1, 2 * mm),
+    ]
 
-    story.append(
-        Spacer(
-            1,
-            2 * mm,
-        )
-    )
-
-    story.append(
+    clarification_section = [
         Paragraph(
             safe_text(
                 "In case you need, any further clarifications on the subject please feel free to contact us thanking you and assuring you of our best services at all times."
             ),
             closing_style,
-        )
-    )
-
-    story.append(
-        Spacer(
-            1,
-            2 * mm,
-        )
-    )
-
-    story.append(
-        Paragraph(
-            "Thanking you",
-            closing_style,
-        )
-    )
-
-    story.append(
-        Spacer(
-            1,
-            7 * mm,
-        )
-    )
+        ),
+        Spacer(1, 2 * mm),
+    ]
 
     company_name = (
         data.company.name
-        or
-        data.company.footerLine1
-        or
-        "—"
+        or data.company.footerLine1
+        or "—"
     )
 
-    story.append(
+    signature_flowables = []
+    signature_image = None
+
+    if data.company.signatureImageDataUrl:
+        signature_image = _signature_flowable(
+            data.company.signatureImageDataUrl,
+        )
+
+    if signature_image is not None:
+        signature_flowables.append(signature_image)
+        signature_flowables.append(Spacer(1, 3 * mm))
+    else:
+        # Preserve the signature area even when no image is uploaded.
+        signature_flowables.append(Spacer(1, 14 * mm))
+
+    signature_label = Table(
+        [[
+            Paragraph(
+                "<b>Authorized Signatory</b>",
+                ParagraphStyle(
+                    "signature_label",
+                    parent=body,
+                    fontSize=9,
+                    leading=12,
+                ),
+            )
+        ]],
+        colWidths=[48 * mm],
+        hAlign="LEFT",
+    )
+
+    signature_label.setStyle(
+        TableStyle(
+            [
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+
+    signature_flowables.append(signature_label)
+
+    signatory_section = [
+        Paragraph("Thanking you", closing_style),
+        Spacer(1, 7 * mm),
         Paragraph(
-            (
-                "<b>"
-                f"{safe_text(company_name)}"
-                "</b>"
-            ),
+            f"<b>{safe_text(company_name)}</b>",
             ParagraphStyle(
                 "terms_company_name",
                 parent=body,
@@ -4804,113 +4904,53 @@ def _append_terms_closing_details(
                 fontSize=9,
                 leading=12,
             ),
-        )
-    )
+        ),
+        *signature_flowables,
+        Spacer(1, 8 * mm),
+    ]
 
-    # Digital signature block.
-    signature_flowables = []
-
-    signature_image = None
-
-    if (
-        data.company
-        .signatureImageDataUrl
-    ):
-        signature_image = (
-            _signature_flowable(
-                data.company
-                .signatureImageDataUrl,
-            )
-        )
-
-    if signature_image is not None:
-        signature_flowables.append(
-            signature_image
-        )
-        signature_flowables.append(
-            Spacer(
-                1,
-                3 * mm,
-            )
-        )
-    else:
-        # Preserve the signature area even when no image is uploaded.
-        signature_flowables.append(
-            Spacer(
-                1,
-                14 * mm,
-            )
-        )
-
-    signature_label = Table(
+    bank_table = Table(
         [
             [
-                Paragraph(
-                    "<b>Authorized Signatory</b>",
-                    ParagraphStyle(
-                        "signature_label",
-                        parent=body,
-                        fontSize=9,
-                        leading=12,
-                    ),
-                )
-            ]
+                Paragraph("<b>Account Name</b>", body),
+                Paragraph("ALPHANUMERIC INNOVATIONS PVT LTD", body),
+            ],
+            [
+                Paragraph("<b>Account Number</b>", body),
+                Paragraph("50200123600412", body),
+            ],
+            [
+                Paragraph("<b>IFSC Code</b>", body),
+                Paragraph("HDFC0009607", body),
+            ],
+            [
+                Paragraph("<b>Branch Name</b>", body),
+                Paragraph("Hitech City-3", body),
+            ],
         ],
         colWidths=[
             48 * mm,
+            CONTENT_WIDTH - 48 * mm,
         ],
         hAlign="LEFT",
     )
 
-    signature_label.setStyle(
+    bank_table.setStyle(
         TableStyle(
             [
-                (
-                    "LEFTPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    0,
-                ),
-                (
-                    "RIGHTPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    0,
-                ),
-                (
-                    "TOPPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    0,
-                ),
-                (
-                    "BOTTOMPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    0,
-                ),
+                ("BOX", (0, 0), (-1, -1), 0.65, MID_GRAY),
+                ("INNERGRID", (0, 0), (-1, -1), 0.55, MID_GRAY),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                ("TOPPADDING", (0, 0), (-1, -1), 7),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+                ("BACKGROUND", (0, 0), (-1, -1), WHITE),
             ]
         )
     )
 
-    signature_flowables.append(
-        signature_label
-    )
-
-    story.append(
-        KeepTogether(
-            signature_flowables
-        )
-    )
-
-    story.append(
-        Spacer(
-            1,
-            8 * mm,
-        )
-    )
-
-    story.append(
+    bank_section = [
         Paragraph(
             "<b>BANK DETAILS</b>",
             ParagraphStyle(
@@ -4922,126 +4962,68 @@ def _append_terms_closing_details(
                 textColor=BLACK,
                 spaceAfter=5,
             ),
-        )
-    )
-
-    bank_rows = [
-        [
-            Paragraph(
-                "<b>Account Name</b>",
-                body,
-            ),
-            Paragraph(
-                "ALPHANUMERIC INNOVATIONS PVT LTD",
-                body,
-            ),
-        ],
-        [
-            Paragraph(
-                "<b>Account Number</b>",
-                body,
-            ),
-            Paragraph(
-                "50200123600412",
-                body,
-            ),
-        ],
-        [
-            Paragraph(
-                "<b>IFSC Code</b>",
-                body,
-            ),
-            Paragraph(
-                "HDFC0009607",
-                body,
-            ),
-        ],
-        [
-            Paragraph(
-                "<b>Branch Name</b>",
-                body,
-            ),
-            Paragraph(
-                "Hitech City-3",
-                body,
-            ),
-        ],
+        ),
+        bank_table,
     ]
 
-    bank_table = Table(
-        bank_rows,
-        colWidths=[
-            48 * mm,
-            CONTENT_WIDTH
-            - 48 * mm,
-        ],
-        hAlign="LEFT",
-    )
+    return [
+        offer_section,
+        clarification_section,
+        signatory_section,
+        bank_section,
+    ]
 
-    bank_table.setStyle(
-        TableStyle(
-            [
-                (
-                    "BOX",
-                    (0, 0),
-                    (-1, -1),
-                    0.65,
-                    MID_GRAY,
-                ),
-                (
-                    "INNERGRID",
-                    (0, 0),
-                    (-1, -1),
-                    0.55,
-                    MID_GRAY,
-                ),
-                (
-                    "VALIGN",
-                    (0, 0),
-                    (-1, -1),
-                    "MIDDLE",
-                ),
-                (
-                    "LEFTPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    7,
-                ),
-                (
-                    "RIGHTPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    7,
-                ),
-                (
-                    "TOPPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    7,
-                ),
-                (
-                    "BOTTOMPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    7,
-                ),
-                (
-                    "BACKGROUND",
-                    (0, 0),
-                    (-1, -1),
-                    WHITE,
-                ),
-            ]
-        )
-    )
 
-    story.append(
-        KeepTogether(
-            [
-                bank_table,
-            ]
+def _append_terms_closing_details(
+    story: list,
+    data: QuotationData,
+    body: ParagraphStyle,
+):
+    for section in _terms_closing_sections(data, body):
+        story.extend(section)
+
+
+def _append_closing_sections_with_logo_on_overflow(
+    story: list,
+    data: QuotationData,
+    body: ParagraphStyle,
+    small_style: ParagraphStyle,
+    remaining_height: float,
+):
+    """Use remaining Terms-page space and add a logo on continuation pages."""
+    sections = _terms_closing_sections(data, body)
+    remaining = max(0.0, float(remaining_height))
+
+    first_section = True
+
+    for section in sections:
+        # Use a modest gap only before the first closing paragraph.
+        prefix = [Spacer(1, 5 * mm)] if first_section else []
+        candidate = prefix + section
+        candidate_height = _flowables_height(candidate)
+
+        if candidate_height <= remaining:
+            story.extend(candidate)
+            remaining -= candidate_height
+            first_section = False
+            continue
+
+        # The next closing chunk does not fit. Start a fresh page and
+        # explicitly restore the logo before continuing the closing data.
+        story.append(PageBreak())
+        logo_header = _logo_header(data, small_style)
+        story.append(logo_header)
+        story.append(Spacer(1, 2.5 * mm))
+
+        remaining = (
+            USABLE_FRAME_HEIGHT
+            - _measure_table_height(logo_header)
+            - 2.5 * mm
         )
-    )
+
+        story.extend(section)
+        remaining -= _flowables_height(section)
+        first_section = False
 
 
 def _build_terms_page(
@@ -5205,21 +5187,46 @@ def _build_terms_page(
             body,
         )
 
-    # Continue directly with the closing section after the final term.
-    # Do not force a new page here; use the remaining space on the
-    # current Terms page first. ReportLab will move only the content
-    # that genuinely does not fit to the next physical page.
-    story.append(
-        Spacer(
-            1,
-            5 * mm,
-        )
+    # Use all available space after the final term. If a later closing
+    # chunk has to continue on another page, that continuation page
+    # explicitly starts with the company logo.
+    last_page_items = (
+        term_pages[-1]
+        if term_pages
+        else []
     )
 
-    _append_terms_closing_details(
+    last_page_flowables = []
+    for item in last_page_items:
+        last_page_flowables.extend(
+            _term_block_flowables(
+                item["block_text"],
+                item["term_number"],
+                item["block_index"],
+                item["is_last_block"],
+                body,
+            )
+        )
+
+    last_terms_height = _flowables_height(
+        last_page_flowables
+    )
+
+    remaining_height = max(
+        0.0,
+        USABLE_FRAME_HEIGHT
+        - header_height
+        - TERMS_PAGE_GAP
+        - last_terms_height
+        - TERMS_PAGE_SAFETY,
+    )
+
+    _append_closing_sections_with_logo_on_overflow(
         story,
         data,
         body,
+        small_style,
+        remaining_height,
     )
 
 

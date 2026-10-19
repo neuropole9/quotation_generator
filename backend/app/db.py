@@ -1,29 +1,62 @@
 import os
 from collections.abc import Generator
 
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
+# Load backend/.env during local development.
+# On Render, environment variables are supplied by the service itself.
+load_dotenv()
+
+
 def _database_url() -> str:
     """
-    Use PostgreSQL in production when DATABASE_URL is configured.
+    Return the PostgreSQL connection URL.
 
-    Local development falls back to a SQLite file so the quotation
-    save/edit workflow can be tested without installing PostgreSQL.
+    This project is PostgreSQL-only. SQLite fallback is intentionally
+    disabled so local and production environments use the same database
+    engine and behavior.
     """
     raw_url = os.getenv(
         "DATABASE_URL",
-        "sqlite:///./quotation_generator.db",
+        "",
     ).strip()
 
-    # Some hosting providers still expose the legacy postgres:// prefix.
-    # SQLAlchemy expects postgresql://.
-    if raw_url.startswith("postgres://"):
+    if not raw_url:
+        raise RuntimeError(
+            "DATABASE_URL is required. "
+            "Set it to a PostgreSQL connection string."
+        )
+
+    # Render and some PostgreSQL providers expose postgresql:// or the
+    # legacy postgres:// scheme. The installed driver is psycopg v3, so
+    # normalize both forms to SQLAlchemy's explicit psycopg dialect.
+    if raw_url.startswith(
+        "postgres://"
+    ):
         raw_url = (
-            "postgresql://"
-            + raw_url[len("postgres://") :]
+            "postgresql+psycopg://"
+            + raw_url[
+                len("postgres://") :
+            ]
+        )
+    elif raw_url.startswith(
+        "postgresql://"
+    ):
+        raw_url = (
+            "postgresql+psycopg://"
+            + raw_url[
+                len("postgresql://") :
+            ]
+        )
+    elif not raw_url.startswith(
+        "postgresql+psycopg://"
+    ):
+        raise RuntimeError(
+            "DATABASE_URL must use PostgreSQL."
         )
 
     return raw_url
@@ -37,15 +70,9 @@ class Base(DeclarativeBase):
 
 
 def _create_engine() -> Engine:
-    connect_args: dict[str, object] = {}
-
-    if DATABASE_URL.startswith("sqlite"):
-        connect_args["check_same_thread"] = False
-
     return create_engine(
         DATABASE_URL,
         pool_pre_ping=True,
-        connect_args=connect_args,
     )
 
 
@@ -61,7 +88,11 @@ SessionLocal = sessionmaker(
 )
 
 
-def get_db() -> Generator[Session, None, None]:
+def get_db() -> Generator[
+    Session,
+    None,
+    None,
+]:
     db = SessionLocal()
 
     try:
