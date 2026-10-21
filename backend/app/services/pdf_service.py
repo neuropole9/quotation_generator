@@ -307,21 +307,33 @@ def _logo_flowable(
     )
 
 
+DEFAULT_SIGNATURE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "assets"
+    / "default-signature.png"
+)
+
+
 def _signature_flowable(
     data_url: str,
 ):
-    image_stream = (
-        _decode_data_url(
-            data_url,
-        )
+    # A custom uploaded signature overrides the bundled default.
+    # Empty data is retained in older/new records to mean "use default".
+    image_source = (
+        _decode_data_url(data_url)
+        if data_url
+        else None
     )
-
-    if image_stream is None:
-        return None
+    if image_source is None:
+        if not DEFAULT_SIGNATURE_PATH.is_file():
+            raise FileNotFoundError(
+                f"Default signature asset is missing: {DEFAULT_SIGNATURE_PATH}"
+            )
+        image_source = str(DEFAULT_SIGNATURE_PATH)
 
     try:
         signature = Image(
-            image_stream,
+            image_source,
             width=40 * mm,
             height=16 * mm,
             kind="proportional",
@@ -823,7 +835,7 @@ def _draw_page_footer(
     )
     canvas.drawString(
         left,
-        7 * mm,
+        3.4 * mm,
         "Auto Generated Quote",
     )
 
@@ -4847,10 +4859,9 @@ def _terms_closing_sections(
     signature_flowables = []
     signature_image = None
 
-    if data.company.signatureImageDataUrl:
-        signature_image = _signature_flowable(
-            data.company.signatureImageDataUrl,
-        )
+    signature_image = _signature_flowable(
+        data.company.signatureImageDataUrl or "",
+    )
 
     if signature_image is not None:
         signature_flowables.append(signature_image)

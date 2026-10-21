@@ -7117,7 +7117,7 @@ export default function QuotationBuilder({
 
         <Section
           title="09 — Digital Signature & Bank Details"
-          description="Upload the digital signature. Bank details are fixed and will be printed automatically on the final Terms & Conditions page."
+          description="A default signature is applied automatically. Upload a different signature for this quotation when needed; bank details remain fixed."
         >
           <div className="signature-bank-editor">
             <div className="signature-bank-editor__group">
@@ -7126,44 +7126,43 @@ export default function QuotationBuilder({
               </h3>
 
               <div className="signature-upload-area">
-                <Field
-                  label="Digital Signature Image"
-                  wide
-                >
+                <Field label="Upload Different Signature (Optional)" wide>
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
-                    onChange={
-                      handleSignatureUpload
-                    }
+                    onChange={handleSignatureUpload}
                   />
                 </Field>
 
-                {currentData.company
-                  .signatureImageDataUrl ? (
-                  <div className="signature-image-review">
-                    <img
-                      src={
-                        currentData.company
-                          .signatureImageDataUrl
-                      }
-                      alt="Digital signature"
-                    />
-
+                <div className="signature-image-review">
+                  <img
+                    src={
+                      currentData.company.signatureImageDataUrl ||
+                      `${import.meta.env.BASE_URL}default-signature.png`
+                    }
+                    alt={
+                      currentData.company.signatureImageDataUrl
+                        ? "Custom signature for this quotation"
+                        : "Default authorized signature"
+                    }
+                  />
+                  <p>
+                    {currentData.company.signatureImageDataUrl
+                      ? "Custom signature selected for this quotation."
+                      : "Default signature selected automatically."}
+                  </p>
+                  {currentData.company.signatureImageDataUrl ? (
                     <button
                       type="button"
                       className="secondary-button"
                       onClick={() =>
-                        patchCompany({
-                          signatureImageDataUrl:
-                            "",
-                        })
+                        patchCompany({ signatureImageDataUrl: "" })
                       }
                     >
-                      Remove Signature
+                      Restore Default Signature
                     </button>
-                  </div>
-                ) : null}
+                  ) : null}
+                </div>
               </div>
             </div>
 
