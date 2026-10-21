@@ -1,6 +1,7 @@
 import base64
 import html
 import io
+from pathlib import Path
 import re
 from typing import Any
 
@@ -286,29 +287,24 @@ def _decode_data_url(
         return None
 
 
+# Bundled server-side logo: applies to old and new quotations alike.
+COMPANY_LOGO_PATH = Path(__file__).resolve().parents[1] / "assets" / "company-logo.png"
+
+
 def _logo_flowable(
     data_url: str,
 ):
-    image_stream = (
-        _decode_data_url(
-            data_url,
-        )
+    # The logo is application-owned, not taken from user-submitted data.
+    # Preserve the argument for backward compatibility with existing callers.
+    if not COMPANY_LOGO_PATH.is_file():
+        raise FileNotFoundError(f"Company logo asset is missing: {COMPANY_LOGO_PATH}")
+
+    return Image(
+        str(COMPANY_LOGO_PATH),
+        width=56 * mm,
+        height=32 * mm,
+        kind="proportional",
     )
-
-    if image_stream is None:
-        return None
-
-    try:
-        # Larger quotation logo.
-        return Image(
-            image_stream,
-            width=56 * mm,
-            height=32 * mm,
-            kind="proportional",
-        )
-
-    except Exception:
-        return None
 
 
 def _signature_flowable(
@@ -827,7 +823,7 @@ def _draw_page_footer(
     )
     canvas.drawString(
         left,
-        3.4 * mm,
+        7 * mm,
         "Auto Generated Quote",
     )
 
@@ -1389,7 +1385,7 @@ def _build_abstract_page(
         [
             [
                 Paragraph(
-                    "<b>Total Amount (Excl. GST)</b>",
+                    "<b>Subtotal</b>",
                     body_right,
                 ),
                 "",
@@ -1405,7 +1401,7 @@ def _build_abstract_page(
             ],
             [
                 Paragraph(
-                    f"GST @ {GLOBAL_GST_RATE:g}%",
+                    f"GST {GLOBAL_GST_RATE:g}%",
                     body_right,
                 ),
                 "",
@@ -1417,7 +1413,7 @@ def _build_abstract_page(
             ],
             [
                 Paragraph(
-                    "<b>Total Amount (Incl. GST)</b>",
+                    "<b>Grand Total</b>",
                     body_right,
                 ),
                 "",

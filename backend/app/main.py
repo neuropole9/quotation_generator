@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.db import Base, engine
 from app.models.saved_quotation import SavedQuotation  # noqa: F401
 from app.routes.health import router as health_router
+from app.routes.admin_users import router as admin_users_router
 from app.routes.quotation import router as quotation_router
 from app.routes.saved_quotations import router as saved_quotations_router
 from app.routes.templates import router as templates_router
@@ -90,6 +91,11 @@ app.include_router(
     prefix="/api",
 )
 app.include_router(full_quotation_import_router, prefix="/api")
+
+app.include_router(
+    admin_users_router,
+    prefix="/api",
+)
 
 @app.get("/")
 def root():
