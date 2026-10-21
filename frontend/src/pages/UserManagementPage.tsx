@@ -1,3 +1,4 @@
+import "../styles/QuoteDeskPages.css";
 import {
   useAuth,
   UserButton,
@@ -556,6 +557,7 @@ export default function UserManagementPage({
 
   return (
     <div
+      className="qd-users-page"
       style={{
         minHeight: "100vh",
         background: "#f5f6f8",
@@ -580,7 +582,7 @@ export default function UserManagementPage({
               color: "#111827",
             }}
           >
-            Quotation Generator
+            Alphanumeric QuoteDesk
           </strong>
 
           <div

@@ -1,0 +1,215 @@
+/* QuoteDesk application UI only. Do not style .bw-page or PDF output. */
+:root {
+  --qd-blue: #247bf2;
+  --qd-blue-dark: #165dcc;
+  --qd-navy: #111e34;
+  --qd-bg: #f3f6fb;
+  --qd-border: #dce5f0;
+  --qd-text: #15243c;
+  --qd-muted: #64748b;
+}
+
+/* Shared app headers / buttons */
+.topbar.builder-topbar {
+  background: #fff;
+  border-bottom: 1px solid var(--qd-border);
+  box-shadow: 0 1px 4px rgba(17, 30, 52, .04);
+}
+.topbar .brand-mark {
+  background: var(--qd-blue);
+  color: #fff;
+  border-radius: 10px !important;
+}
+.topbar .brand-name { color: var(--qd-navy); letter-spacing: -.02em; }
+.topbar .brand-subtitle { color: var(--qd-muted); }
+.builder-actions .primary-button,
+.builder-bottom-actions .primary-button,
+.terms-editor__add {
+  color: white;
+  background: var(--qd-blue);
+  border-color: var(--qd-blue);
+  border-radius: 8px !important;
+}
+.builder-actions .primary-button:hover,
+.builder-bottom-actions .primary-button:hover,
+.terms-editor__add:hover { background: var(--qd-blue-dark); border-color: var(--qd-blue-dark); }
+.builder-actions .secondary-button,
+.builder-actions .preview-button,
+.builder-bottom-actions .secondary-button,
+.builder-bottom-actions .preview-button {
+  color: var(--qd-navy);
+  background: #fff;
+  border: 1px solid var(--qd-border);
+  border-radius: 8px !important;
+}
+.builder-actions .secondary-button:hover,
+.builder-actions .preview-button:hover,
+.builder-bottom-actions .secondary-button:hover {
+  color: var(--qd-blue-dark); border-color: var(--qd-blue);
+  background: #f1f6ff;
+}
+.builder-actions button:focus-visible,
+.builder-form-panel button:focus-visible,
+.qd-saved-view button:focus-visible,
+.qd-users-page button:focus-visible { outline: 3px solid #92bfff; outline-offset: 2px; }
+
+/* Editor layout */
+.builder-form-panel { background: var(--qd-bg) !important; }
+.builder-intro--full h1 { color: var(--qd-navy); }
+.builder-intro--full .eyebrow { color: var(--qd-blue); }
+.quotation-workspace-nav {
+  border-color: var(--qd-border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(17,30,52,.045);
+}
+.quotation-workspace-tab.is-active {
+  color: var(--qd-blue-dark);
+  border-bottom-color: var(--qd-blue);
+}
+.quotation-workspace-tab.is-active .quotation-workspace-tab__index {
+  background: var(--qd-blue);
+  border-color: var(--qd-blue);
+}
+.builder-form-panel .form-section,
+.part-product-card,
+.signature-bank-editor__group {
+  border: 1px solid var(--qd-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: white;
+  box-shadow: 0 4px 16px rgba(17,30,52,.025);
+}
+.builder-form-panel .form-section__heading,
+.part-product-card__header,
+.terms-editor__header {
+  background: #f9fbff;
+  border-bottom-color: var(--qd-border);
+}
+.builder-form-panel .field input,
+.builder-form-panel .field textarea,
+.builder-form-panel .field select,
+.terms-editor__content textarea {
+  border-radius: 8px !important;
+  border-color: #ccd8e8;
+}
+.builder-form-panel .field input:focus,
+.builder-form-panel .field textarea:focus,
+.builder-form-panel .field select:focus,
+.terms-editor__content textarea:focus {
+  border-color: var(--qd-blue);
+  box-shadow: 0 0 0 3px #247bf222;
+}
+.builder-form-panel .secondary-button,
+.add-product-button,
+.insert-column-button {
+  border-radius: 8px !important;
+}
+.builder-form-panel .terms-editor__row.is-selected { box-shadow: inset 3px 0 var(--qd-blue); }
+.terms-editor__check input { accent-color: var(--qd-blue); }
+.builder-bottom-actions { border-top-color: var(--qd-border); }
+
+/* Saved quotations: target the existing table, without changing API or actions. */
+.qd-saved-view { background: var(--qd-bg); color: var(--qd-text); }
+.qd-saved-view h1 { color: var(--qd-navy) !important; letter-spacing: -.025em; }
+.qd-saved-view input,
+.qd-saved-view select {
+  border-radius: 8px !important;
+  border-color: var(--qd-border) !important;
+  background: #fff;
+}
+.qd-saved-view input:focus-visible,
+.qd-saved-view select:focus-visible { outline-color: var(--qd-blue); }
+.qd-saved-view > div:has(> table) { border-radius: 12px; }
+.qd-saved-view table { background: white; }
+.qd-saved-view table thead tr { background: #edf4ff !important; }
+.qd-saved-view table th { color: #324c71 !important; border-bottom: 1px solid var(--qd-border); }
+.qd-saved-view table td { border-bottom: 1px solid #e8eef6 !important; }
+.qd-saved-view table tbody tr:hover { background: #f8fbff; }
+.qd-saved-view table .secondary-button {
+  border-radius: 7px !important;
+  border: 1px solid #cbdbee;
+  background: white;
+  color: #1c4f9e;
+}
+.qd-saved-view table .secondary-button:hover { border-color: var(--qd-blue); background: #eaf3ff; }
+.qd-saved-view table .secondary-button[style*="color"] { color: #b42318 !important; border-color: #fecaca !important; }
+
+/* User management: inline styles from the existing JSX require explicit overrides. */
+.qd-users-page { background: var(--qd-bg) !important; color: var(--qd-text); }
+.qd-users-page > header {
+  background: white !important;
+  border-bottom: 1px solid var(--qd-border) !important;
+  box-shadow: 0 1px 4px rgba(17,30,52,.04);
+}
+.qd-users-page > header strong { color: var(--qd-navy) !important; }
+.qd-users-page > main > div > h1 { color: var(--qd-navy) !important; letter-spacing: -.025em; }
+.qd-users-page > main > div > div:first-child { color: #3775c4; }
+.qd-users-page section {
+  border: 1px solid var(--qd-border) !important;
+  border-radius: 12px;
+  background: white;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(17,30,52,.03);
+}
+.qd-users-page section input {
+  border: 1px solid #ccd8e8 !important;
+  border-radius: 8px !important;
+  outline: 0;
+}
+.qd-users-page section input:focus {
+  border-color: var(--qd-blue) !important;
+  box-shadow: 0 0 0 3px #247bf222;
+}
+.qd-users-page button {
+  border-radius: 8px !important;
+  transition: background-color .15s, border-color .15s;
+}
+.qd-users-page button[type="submit"]:not(:disabled) {
+  background: var(--qd-blue) !important;
+  border-color: var(--qd-blue) !important;
+  color: white !important;
+}
+.qd-users-page button[type="submit"]:hover:not(:disabled) { background: var(--qd-blue-dark) !important; }
+.qd-users-page table { background: white; }
+.qd-users-page table thead tr { background: #edf4ff !important; }
+.qd-users-page table th { color: #324c71 !important; }
+.qd-users-page table td { border-bottom-color: #e8eef6 !important; }
+.qd-users-page table tbody tr:hover { background: #f8fbff; }
+
+@media (max-width: 760px) {
+  .qd-users-page > header { padding: 12px 16px !important; gap: 12px; flex-wrap: wrap; }
+  .qd-users-page > main { padding: 24px 16px !important; }
+  .qd-users-page > main > div[style*="grid"] { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
+  .qd-users-page form > div[style*="grid"] { grid-template-columns: 1fr !important; }
+  .qd-saved-view { padding-left: 16px !important; padding-right: 16px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qd-users-page button { transition: none; }
+}
+
+/* Compact User Management statistics cards */
+
+.qd-users-page .qd-user-stats,
+.qd-user-management .qd-user-stats {
+  gap: 12px;
+}
+
+.qd-users-page .qd-user-stat-card,
+.qd-user-management .qd-user-stat-card {
+  min-height: 88px;
+  padding: 14px 18px;
+  border-radius: 10px;
+}
+
+.qd-users-page .qd-user-stat-card span,
+.qd-user-management .qd-user-stat-card span {
+  font-size: 11px;
+  margin-bottom: 5px;
+}
+
+.qd-users-page .qd-user-stat-card strong,
+.qd-user-management .qd-user-stat-card strong {
+  font-size: 24px;
+  line-height: 1.15;
+}

@@ -1,3 +1,4 @@
+import "../styles/QuoteDeskPages.css";
 import {
   useAuth,
 } from "@clerk/react";
@@ -6,6 +7,8 @@ import {
 import {
 
   useMemo,
+
+  useEffect,
 
   useState,
 
@@ -79,6 +82,10 @@ interface Props {
 
 
   onBack: () => void;
+
+  isAdmin?: boolean;
+
+  startInSavedQuotations?: boolean;
 
 }
 
@@ -1282,6 +1289,10 @@ export default function QuotationBuilder({
 
   onBack,
 
+  isAdmin = false,
+
+  startInSavedQuotations = false,
+
 }: Props) {
 
   const {
@@ -1490,7 +1501,7 @@ export default function QuotationBuilder({
 
     setShowSavedQuotations,
 
-  ] = useState(false);
+  ] = useState(startInSavedQuotations);
 
 
   const [
@@ -3175,6 +3186,29 @@ export default function QuotationBuilder({
     };
 
 
+  // When opened from the dashboard sidebar, fetch saved quotations
+  // automatically once the Clerk session is ready.
+  useEffect(() => {
+    if (!startInSavedQuotations || !isAuthLoaded || !isSignedIn) return;
+    let active = true;
+    const loadInitialSavedQuotations = async () => {
+      setLoadingSavedQuotations(true);
+      try {
+        const token = await getToken();
+        if (!token) throw new Error("Unable to get the Clerk session token.");
+        const result = await listQuotations({ limit: 500 }, token);
+        if (active) setSavedQuotations(result.items);
+      } catch (err) {
+        if (active) setError(err instanceof Error ? err.message : "Unable to load saved quotations.");
+      } finally {
+        if (active) setLoadingSavedQuotations(false);
+      }
+    };
+    void loadInitialSavedQuotations();
+    return () => { active = false; };
+  }, [startInSavedQuotations, isAuthLoaded, isSignedIn, getToken]);
+
+
   const handleOpenSavedQuotations =
 
     async () => {
@@ -3911,11 +3945,8 @@ export default function QuotationBuilder({
 
               >
 
-                Quotation
-
-                Generator
-
-              </strong>
+                Alphanumeric QuoteDesk
+</strong>
 
 
               <span
@@ -4010,7 +4041,7 @@ export default function QuotationBuilder({
         ) : null}
 
 
-        <main
+        <main className="qd-saved-view"
 
           style={{
 
@@ -4961,11 +4992,8 @@ export default function QuotationBuilder({
 
               <strong className="brand-name">
 
-                Quotation
-
-                Generator
-
-              </strong>
+                Alphanumeric QuoteDesk
+</strong>
 
 
 
@@ -5175,11 +5203,8 @@ export default function QuotationBuilder({
 
             <strong className="brand-name">
 
-              Quotation
-
-              Generator
-
-            </strong>
+              Alphanumeric QuoteDesk
+</strong>
 
 
 
@@ -5313,6 +5338,7 @@ export default function QuotationBuilder({
 
 
 
+          {!isAdmin && (
           <button
 
             type="button"
@@ -5330,6 +5356,7 @@ export default function QuotationBuilder({
             Saved Quotations
 
           </button>
+          )}
 
 
           {savedQuotationStatus !==
