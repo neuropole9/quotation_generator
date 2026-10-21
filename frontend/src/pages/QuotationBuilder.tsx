@@ -5749,7 +5749,7 @@ export default function QuotationBuilder({
 
               <span className="quotation-workspace-tab__copy">
                 <strong>
-                  Product Details
+                  Products BOQ
                 </strong>
 
                 <small>

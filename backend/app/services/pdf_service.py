@@ -1669,7 +1669,7 @@ def _detail_header(
 
     left_content = Paragraph(
         (
-            "<b>PRODUCT DETAILS</b>"
+            "<b>PRODUCTS BOQ</b>"
             "<br/>"
             "<font size='7'>"
             "Quotation No: "
