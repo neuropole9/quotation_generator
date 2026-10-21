@@ -84,6 +84,7 @@ interface Props {
   onBack: () => void;
 
   isAdmin?: boolean;
+  hideSavedQuotationsButton?: boolean;
 
   startInSavedQuotations?: boolean;
 
@@ -1290,6 +1291,7 @@ export default function QuotationBuilder({
   onBack,
 
   isAdmin = false,
+  hideSavedQuotationsButton = false,
 
   startInSavedQuotations = false,
 
@@ -5338,7 +5340,7 @@ export default function QuotationBuilder({
 
 
 
-          {!isAdmin && (
+          {!isAdmin && !hideSavedQuotationsButton && (
           <button
 
             type="button"

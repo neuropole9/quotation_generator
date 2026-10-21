@@ -7,6 +7,7 @@ import {
 import "./AdminDashboard.css";
 
 interface AdminDashboardProps {
+  isAdmin?: boolean;
   onManageUsers: () => void;
   onOpenQuotation: () => void;
   onOpenSavedQuotations: () => void;
@@ -55,6 +56,7 @@ function DashboardIcon({ name, size = 20 }: { name: IconName; size?: number }) {
 
 export default function AdminDashboard({
   onManageUsers,
+  isAdmin = true,
   onOpenQuotation,
   onOpenSavedQuotations,
 }: AdminDashboardProps) {
@@ -109,8 +111,8 @@ export default function AdminDashboard({
         <nav className="qd-nav">
           <div className="qd-nav-current" aria-current="page"><DashboardIcon name="dashboard" /> <span>Overview</span></div>
           <button type="button" onClick={goToQuotation}><DashboardIcon name="plus" /> <span>Create Quotation</span><DashboardIcon name="arrow" size={15} /></button>
-          <button type="button" onClick={goToSavedQuotations}><DashboardIcon name="document" /> <span>Saved Quotations</span><DashboardIcon name="arrow" size={15} /></button>
-          <button type="button" onClick={goToUsers}><DashboardIcon name="users" /> <span>User Management</span><DashboardIcon name="arrow" size={15} /></button>
+          <button type="button" onClick={goToSavedQuotations}><DashboardIcon name="document" /> <span>{isAdmin ? "Saved Quotations" : "My Quotations"}</span><DashboardIcon name="arrow" size={15} /></button>
+          {isAdmin && <button type="button" onClick={goToUsers}><DashboardIcon name="users" /> <span>User Management</span><DashboardIcon name="arrow" size={15} /></button>}
         </nav>
 
         <div className="qd-sidebar-bottom">
@@ -137,9 +139,9 @@ export default function AdminDashboard({
         <main className="qd-main">
           <div className="qd-title-row">
             <div>
-              <div className="qd-eyebrow">ADMINISTRATION / OVERVIEW</div>
+              <div className="qd-eyebrow">{isAdmin ? "ADMINISTRATION / OVERVIEW" : "MY WORKSPACE / OVERVIEW"}</div>
               <h1>Welcome back, {displayName}</h1>
-              <p>Manage quotations and user access from one workspace.</p>
+              <p>{isAdmin ? "Manage quotations and user access from one workspace." : "Create, edit and manage your quotations."}</p>
             </div>
             <button type="button" className="qd-primary-action" onClick={goToQuotation}><DashboardIcon name="plus" size={18} /> New quotation</button>
           </div>
@@ -148,7 +150,7 @@ export default function AdminDashboard({
             <div className="qd-hero-copy">
               <span className="qd-hero-tag"><DashboardIcon name="sparkles" size={15} /> YOUR WORKSPACE</span>
               <h2>Business quotations, simplified.</h2>
-              <p>Create polished quotations, manage saved records and keep your team organized with QuoteDesk.</p>
+              <p>{isAdmin ? "Create polished quotations, manage saved records and keep your team organized with QuoteDesk." : "Create polished quotations and manage your saved records with QuoteDesk."}</p>
               <button type="button" className="qd-hero-button" onClick={goToQuotation}>Open quotation builder <DashboardIcon name="arrow" size={17} /></button>
             </div>
             <div className="qd-hero-art" aria-hidden="true"><div className="qd-art-page"><div className="qd-art-top"/><div className="qd-art-line qd-art-line--wide"/><div className="qd-art-line"/><div className="qd-art-table"><span/><span/><span/><span/><span/><span/></div><div className="qd-art-total"/></div><div className="qd-art-check">✓</div></div>

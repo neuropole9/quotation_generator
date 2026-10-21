@@ -30,12 +30,13 @@ export default function App() {
   const isAdmin = role === "admin";
 
   useEffect(() => {
-    if (!isLoaded || !user || !isAdmin) return;
+    if (!isLoaded || !user) return;
 
     const currentState = (window.history.state || {}) as AppHistoryState;
     if (
       currentState.quotationUserId === user.id &&
-      isAdminView(currentState.quotationAdminView)
+      isAdminView(currentState.quotationAdminView) &&
+      (isAdmin || currentState.quotationAdminView !== "users")
     ) {
       setAdminView(currentState.quotationAdminView);
     } else {
@@ -55,7 +56,8 @@ export default function App() {
       const state = (event.state || {}) as AppHistoryState;
       if (
         state.quotationUserId === user.id &&
-        isAdminView(state.quotationAdminView)
+        isAdminView(state.quotationAdminView) &&
+        (isAdmin || state.quotationAdminView !== "users")
       ) {
         setAdminView(state.quotationAdminView);
       } else {
@@ -68,7 +70,7 @@ export default function App() {
 
   const openAdminView = useCallback(
     (view: AdminView) => {
-      if (!user || !isAdmin) return;
+      if (!user || (view === "users" && !isAdmin)) return;
       const currentState = (window.history.state || {}) as AppHistoryState;
       window.history.pushState(
         {
@@ -85,7 +87,7 @@ export default function App() {
   );
 
   const backToDashboard = useCallback(() => {
-    if (!user || !isAdmin) return;
+    if (!user) return;
     const currentState = (window.history.state || {}) as AppHistoryState;
     if (
       currentState.quotationUserId === user.id &&
@@ -143,43 +145,33 @@ export default function App() {
       </Show>
 
       <Show when="signed-in">
-        {isAdmin ? (
-          adminView === "users" ? (
-            <UserManagementPage onBack={backToDashboard} />
-          ) : adminView === "quotation" || adminView === "saved" ? (
-            <>
-              <QuotationSessionBar isAdmin onBackToDashboard={backToDashboard} />
-              <QuotationBuilder
-                key={adminView}
-                selectedTemplate="classic"
-                onTemplateChange={() => {
-                  // Template switching is disabled.
-                }}
-                onBack={backToDashboard}
-                isAdmin
-                startInSavedQuotations={adminView === "saved"}
-              />
-            </>
-          ) : (
-            <AdminDashboard
-              onManageUsers={() => openAdminView("users")}
-              onOpenQuotation={() => openAdminView("quotation")}
-              onOpenSavedQuotations={() => openAdminView("saved")}
-            />
-          )
-        ) : (
+        {adminView === "users" && isAdmin ? (
+          <UserManagementPage onBack={backToDashboard} />
+        ) : adminView === "quotation" || adminView === "saved" ? (
           <>
-            <QuotationSessionBar isAdmin={false} />
+            <QuotationSessionBar
+              isAdmin={isAdmin}
+              onBackToDashboard={backToDashboard}
+            />
             <QuotationBuilder
+              key={`${user?.id}-${adminView}`}
               selectedTemplate="classic"
               onTemplateChange={() => {
                 // Template switching is disabled.
               }}
-              onBack={() => {
-                // Non-admins remain in the editor.
-              }}
+              onBack={backToDashboard}
+              isAdmin={isAdmin}
+              hideSavedQuotationsButton
+              startInSavedQuotations={adminView === "saved"}
             />
           </>
+        ) : (
+          <AdminDashboard
+            isAdmin={isAdmin}
+            onManageUsers={() => openAdminView("users")}
+            onOpenQuotation={() => openAdminView("quotation")}
+            onOpenSavedQuotations={() => openAdminView("saved")}
+          />
         )}
       </Show>
     </>
