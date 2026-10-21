@@ -188,28 +188,33 @@
   .qd-users-page button { transition: none; }
 }
 
-/* Compact User Management statistics cards */
-
-.qd-users-page .qd-user-stats,
-.qd-user-management .qd-user-stats {
-  gap: 12px;
+/* Quotation autosave indicator (application UI only; no PDF changes) */
+.qd-autosave {
+  max-width: 1440px;
+  margin: 12px auto 0;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+  font-weight: 650;
+  color: #50627c;
+  background: #f8fbff;
+  border: 1px solid var(--qd-border);
+  border-radius: 9px;
 }
-
-.qd-users-page .qd-user-stat-card,
-.qd-user-management .qd-user-stat-card {
-  min-height: 88px;
-  padding: 14px 18px;
-  border-radius: 10px;
+.qd-autosave__dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: #94a3b8;
 }
-
-.qd-users-page .qd-user-stat-card span,
-.qd-user-management .qd-user-stat-card span {
-  font-size: 11px;
-  margin-bottom: 5px;
-}
-
-.qd-users-page .qd-user-stat-card strong,
-.qd-user-management .qd-user-stat-card strong {
-  font-size: 24px;
-  line-height: 1.15;
+.qd-autosave--pending .qd-autosave__dot,
+.qd-autosave--saving .qd-autosave__dot { background: var(--qd-blue); }
+.qd-autosave--saved .qd-autosave__dot { background: #16a34a; }
+.qd-autosave--error { color: #b42318; background: #fff5f5; border-color: #fecaca; }
+.qd-autosave--error .qd-autosave__dot { background: #dc2626; }
+@media (max-width: 760px) {
+  .qd-autosave { margin: 10px 16px 0; }
 }

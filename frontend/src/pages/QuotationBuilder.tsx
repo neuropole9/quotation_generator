@@ -10,6 +10,8 @@ import {
 
   useEffect,
 
+  useRef,
+
   useState,
 
   type ChangeEvent,
@@ -1282,6 +1284,24 @@ const formatServerDateTime = (
 
 
 
+// Preserve the same normalization used by the existing quotation editor.
+const normalizeQuotationForSave = (value: QuotationData): QuotationData => ({
+  ...value,
+  company: {
+    ...value.company,
+    name: FIXED_COMPANY_NAME,
+    address: FIXED_COMPANY_ADDRESS,
+    email: FIXED_COMPANY_EMAIL,
+    website: FIXED_COMPANY_WEBSITE,
+    footerLine1: FIXED_COMPANY_NAME,
+    footerLine2: FIXED_FOOTER_LINE_2,
+  },
+  products: Array.isArray(value.products) ? value.products : [],
+  columns: Array.isArray(value.columns) ? value.columns : [],
+  abstractItems: Array.isArray(value.abstractItems) ? value.abstractItems : [],
+  terms: Array.isArray(value.terms) ? value.terms : createDefaultTerms(),
+});
+
 export default function QuotationBuilder({
 
   selectedTemplate,
@@ -1555,84 +1575,127 @@ export default function QuotationBuilder({
 
 
 
-  const currentData =
+  const currentData = useMemo(
+    () => normalizeQuotationForSave(data),
+    [data],
+  );
 
-    useMemo(
+  // A single request queue is shared by automatic and manual saving.
+  // IDs and status are held in refs so simultaneous requests cannot create duplicates.
+  const quotationIdRef = useRef<number | null>(null);
+  const quotationStatusRef = useRef<QuotationSaveStatus | null>(null);
+  const latestDataRef = useRef(currentData);
+  latestDataRef.current = currentData;
+  const latestFingerprint = JSON.stringify(currentData);
+  const savedFingerprintRef = useRef(latestFingerprint);
+  const sessionRef = useRef(0);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [autosaveState, setAutosaveState] = useState<
+    "idle" | "pending" | "saving" | "saved" | "error"
+  >("idle");
 
-      () => ({
+  const cancelAutosaveTimer = () => {
+    if (autosaveTimerRef.current !== null) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+  };
 
-        ...data,
+  // Clear All, import-as-new, and opening another record must break the
+  // association with any pending network response for the previous document.
+  const resetAutosaveSession = (
+    nextData: QuotationData,
+    quotationId: number | null,
+    status: QuotationSaveStatus | null,
+    treatAsUnsaved = false,
+  ) => {
+    cancelAutosaveTimer();
+    sessionRef.current += 1;
+    quotationIdRef.current = quotationId;
+    quotationStatusRef.current = status;
+    setSavingStatus(null);
+    savedFingerprintRef.current = treatAsUnsaved
+      ? JSON.stringify(normalizeQuotationForSave(createEmptyData(selectedTemplate)))
+      : JSON.stringify(normalizeQuotationForSave(nextData));
+    setAutosaveState(treatAsUnsaved ? "pending" : "idle");
+  };
 
-        company: {
-          ...data.company,
-          name: FIXED_COMPANY_NAME,
-          address: FIXED_COMPANY_ADDRESS,
-          email: FIXED_COMPANY_EMAIL,
-          website: FIXED_COMPANY_WEBSITE,
-          footerLine1: FIXED_COMPANY_NAME,
-          footerLine2: FIXED_FOOTER_LINE_2,
-        },
+  // The queue serializes writes (including first POST), retaining the
+  // existing draft/SAVED status unless the user explicitly chooses Save.
+  const persistQuotation = (
+    requestedStatus?: QuotationSaveStatus,
+    automatic = false,
+  ): Promise<void> => {
+    cancelAutosaveTimer();
+    const requestedSession = sessionRef.current;
+    const run = async () => {
+      if (sessionRef.current !== requestedSession) return;
+      const snapshot = latestDataRef.current;
+      const fingerprint = JSON.stringify(snapshot);
+      const recordId = quotationIdRef.current;
+      const status = requestedStatus ?? quotationStatusRef.current ?? "DRAFT";
+      if (automatic && fingerprint === savedFingerprintRef.current) {
+        setAutosaveState("saved");
+        return;
+      }
+      setAutosaveState("saving");
+      setSavingStatus(status);
+      try {
+        const token = await getRequiredQuotationToken();
+        if (sessionRef.current !== requestedSession) return;
+        const options = { status, data: snapshot };
+        const saved = recordId === null
+          ? await createQuotation(options, token)
+          : await updateQuotation(recordId, options, token);
+        if (sessionRef.current !== requestedSession) return;
+        quotationIdRef.current = saved.id;
+        quotationStatusRef.current = saved.status;
+        savedFingerprintRef.current = fingerprint;
+        setSavedQuotationId(saved.id);
+        setSavedQuotationStatus(saved.status);
+        setAutosaveState(
+          JSON.stringify(latestDataRef.current) === fingerprint ? "saved" : "pending",
+        );
+        setError("");
+        if (!automatic) {
+          setSaveMessage(status === "DRAFT"
+            ? `Draft saved successfully. Record #${saved.id}.`
+            : `Quotation saved successfully. Record #${saved.id}.`);
+        }
+      } catch (err) {
+        if (sessionRef.current === requestedSession) {
+          const message = err instanceof Error ? err.message : "Unable to autosave quotation.";
+          setAutosaveState("error");
+          setError(message);
+        }
+      } finally {
+        if (sessionRef.current === requestedSession) setSavingStatus(null);
+      }
+    };
+    const queued = saveQueueRef.current.then(run, run);
+    saveQueueRef.current = queued;
+    return queued;
+  };
 
-        products:
+  useEffect(() => {
+    if (!isAuthLoaded || !isSignedIn || showSavedQuotations) return;
+    if (latestFingerprint === savedFingerprintRef.current) {
+      setAutosaveState((previous) => previous === "error" ? "saved" : previous);
+      return;
+    }
+    setAutosaveState("pending");
+    const session = sessionRef.current;
+    const timer = setTimeout(() => {
+      if (sessionRef.current === session) void persistQuotation(undefined, true);
+    }, 1800);
+    autosaveTimerRef.current = timer;
+    return () => clearTimeout(timer);
+    // Only reschedule when the document changes; use refs for current auth/save state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestFingerprint, isAuthLoaded, isSignedIn, showSavedQuotations]);
 
-          Array.isArray(
-
-            data.products,
-
-          )
-
-            ? data.products
-
-            : [],
-
-
-
-        columns:
-
-          Array.isArray(
-
-            data.columns,
-
-          )
-
-            ? data.columns
-
-            : [],
-
-
-
-        abstractItems:
-
-          Array.isArray(
-
-            data.abstractItems,
-
-          )
-
-            ? data.abstractItems
-
-            : [],
-
-        terms:
-          Array.isArray(
-            data.terms,
-          )
-            ? data.terms
-            : createDefaultTerms(),
-
-      }),
-
-      [
-
-        data,
-
-      ],
-
-    );
-
-
-
-
+  useEffect(() => () => cancelAutosaveTimer(), []);
 
   const pdfData =
 
@@ -2969,6 +3032,9 @@ export default function QuotationBuilder({
      * record that happened to be open before the import.
      */
 
+    // Imported content starts a separate draft, never overwrites the open record.
+    resetAutosaveSession(createEmptyData(selectedTemplate), null, null, true);
+
     setSavedQuotationId(
 
       null,
@@ -3069,15 +3135,9 @@ export default function QuotationBuilder({
 
     () => {
 
-      setData(
-
-        createEmptyData(
-
-          selectedTemplate,
-
-        ),
-
-      );
+      const blank = createEmptyData(selectedTemplate);
+      resetAutosaveSession(blank, null, null);
+      setData(blank);
 
 
       setSavedQuotationId(
@@ -3268,6 +3328,8 @@ export default function QuotationBuilder({
 
           );
 
+
+        resetAutosaveSession(saved.data, saved.id, saved.status);
 
         setData(
 
@@ -3603,145 +3665,9 @@ export default function QuotationBuilder({
   ======================================================= */
 
 
-  const handleSaveQuotation =
-
-    async (
-
-      status:
-
-        QuotationSaveStatus,
-
-    ) => {
-
-      if (
-
-        savingStatus
-
-      ) {
-
-        return;
-
-      }
-
-
-      setError(
-
-        "",
-
-      );
-
-
-      setSaveMessage(
-
-        "",
-
-      );
-
-
-      setSavingStatus(
-
-        status,
-
-      );
-
-
-      try {
-
-        const token =
-
-          await getRequiredQuotationToken();
-
-
-        const options = {
-
-          status,
-
-          data:
-
-            currentData,
-
-        };
-
-
-        const saved =
-
-          savedQuotationId ===
-
-          null
-
-            ? await createQuotation(
-
-                options,
-
-                token,
-
-              )
-
-            : await updateQuotation(
-
-                savedQuotationId,
-
-                options,
-
-                token,
-
-              );
-
-
-        setSavedQuotationId(
-
-          saved.id,
-
-        );
-
-
-        setSavedQuotationStatus(
-
-          saved.status,
-
-        );
-
-
-        setSaveMessage(
-
-          status === "DRAFT"
-
-            ? `Draft saved successfully. Record #${saved.id}.`
-
-            : `Quotation saved successfully. Record #${saved.id}.`,
-
-        );
-
-      } catch (err) {
-
-        setError(
-
-          err instanceof Error
-
-            ? err.message
-
-            : status === "DRAFT"
-
-              ? "Unable to save draft."
-
-              : "Unable to save quotation.",
-
-        );
-
-      } finally {
-
-        setSavingStatus(
-
-          null,
-
-        );
-
-      }
-
-    };
-
-
-
+  const handleSaveQuotation = async (status: QuotationSaveStatus) => {
+    await persistQuotation(status, false);
+  };
 
 
   /* =======================================================
@@ -5535,6 +5461,15 @@ export default function QuotationBuilder({
 
       ) : null}
 
+
+      <div className={`qd-autosave qd-autosave--${autosaveState}`} role="status" aria-live="polite">
+        <span className="qd-autosave__dot" aria-hidden="true" />
+        {autosaveState === "saving" ? "Saving changes…" :
+         autosaveState === "pending" ? "Unsaved changes · saving shortly" :
+         autosaveState === "saved" ? `All changes saved${savedQuotationId !== null ? ` · #${savedQuotationId}` : ""}` :
+         autosaveState === "error" ? "Autosave failed · retry or use Save Draft" :
+         "Autosave is enabled"}
+      </div>
 
       {saveMessage ? (
 
