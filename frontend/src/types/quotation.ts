@@ -114,6 +114,7 @@ export interface ProductLine {
   unit: string;
   quantity: number;
   unitPrice: number;
+  amount?: number | null;
   gstRate: number;
   customValues: Record<string, string | number>;
 }
@@ -134,6 +135,7 @@ export interface QuotationData {
   abstractItems: QuotationAbstractLine[];
   products: ProductLine[];
   notes: string;
+  gstEnabled?: boolean;
 
   /** Selectable Terms & Conditions used by the new editor/PDF. */
   terms?: QuotationTerm[];

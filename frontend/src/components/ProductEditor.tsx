@@ -15,6 +15,7 @@ import {
 
 interface Props {
   products: ProductLine[];
+  gstEnabled?: boolean;
   columns: QuotationColumn[];
   onChange: (products: ProductLine[]) => void;
   onColumnsChange: (columns: QuotationColumn[]) => void;
@@ -43,7 +44,7 @@ const CUSTOM_COLUMN_TYPES: Array<{
   },
 ];
 
-const createProduct = (): ProductLine => ({
+const createProduct = (gstEnabled = false): ProductLine => ({
   id: crypto.randomUUID(),
   modelNumber: "",
   imageDataUrl: "",
@@ -51,7 +52,8 @@ const createProduct = (): ProductLine => ({
   unit: "Nos",
   quantity: 1,
   unitPrice: 0,
-  gstRate: 18,
+  gstRate: gstEnabled ? 18 : 0,
+  amount: null,
   customValues: {},
 });
 
@@ -98,6 +100,7 @@ const displayColumnLabel = (
 
 export default function ProductEditor({
   products,
+  gstEnabled = false,
   columns,
   onChange,
   onColumnsChange,
@@ -427,11 +430,36 @@ export default function ProductEditor({
 
       case "amount":
         return (
-          <span className="table-readonly-value">
-            {formatCurrency(
-              lineBase(product),
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              aria-label="Line amount"
+              title={product.amount == null ? "Automatic amount" : "Manually entered amount"}
+              value={
+                product.amount ??
+                Math.max(0, product.quantity) * Math.max(0, product.unitPrice)
+              }
+              onChange={(event) => {
+                const value = event.target.value;
+                updateProduct(product.id, {
+                  amount: value === "" ? null : Math.max(0, Number(value)),
+                });
+              }}
+            />
+            {product.amount != null && (
+              <button
+                type="button"
+                className="text-button"
+                title="Restore automatic calculation"
+                aria-label="Restore automatic amount"
+                onClick={() => updateProduct(product.id, { amount: null })}
+              >
+                Auto
+              </button>
             )}
-          </span>
+          </div>
         );
 
       case "customNumber":
@@ -492,8 +520,8 @@ export default function ProductEditor({
             <p>
               Model Number replaces the
               previous product-image column.
-              Qty, Rate and GST continue to
-              control automatic totals.
+              Qty and Rate calculate totals automatically unless
+              you manually override the Total field.
             </p>
           </div>
         </div>
@@ -751,7 +779,7 @@ export default function ProductEditor({
           onClick={() =>
             onChange([
               ...safeProducts,
-              createProduct(),
+              createProduct(gstEnabled),
             ])
           }
         >

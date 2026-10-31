@@ -726,6 +726,8 @@ const createEmptyData = (
 
 
 
+  gstEnabled: false,
+
   products: [
 
     {
@@ -764,7 +766,7 @@ const createEmptyData = (
 
       gstRate:
 
-        18,
+        0,
 
 
 
@@ -6723,6 +6725,23 @@ export default function QuotationBuilder({
 
         >
 
+          <label style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, fontWeight: 600 }}>
+            <input
+              type="checkbox"
+              checked={currentData.gstEnabled ?? false}
+              onChange={(event) =>
+                setData((previous) => ({
+                  ...previous,
+                  gstEnabled: event.target.checked,
+                  products: previous.products.map((product) => ({
+                    ...product,
+                    gstRate: event.target.checked ? 18 : 0,
+                  })),
+                }))
+              }
+            />
+            Enable GST (18%) for this quotation
+          </label>
           <div className="parts-editor">
 
             {currentData.abstractItems.map(
@@ -6834,6 +6853,7 @@ export default function QuotationBuilder({
 
 
                     <ProductEditor
+                      gstEnabled={currentData.gstEnabled ?? false}
 
                       products={
 

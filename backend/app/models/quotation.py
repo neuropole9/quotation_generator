@@ -106,10 +106,10 @@ class ProductLine(BaseModel):
     # New visible field.
     modelNumber: str = ""
 
-    # Legacy field retained so older saved/imported payloads remain valid.
+    # Legacy field retained for compatibility.
     imageDataUrl: str = ""
 
-    # Abstract row / Part association. Blank legacy products belong to Part 1.
+    # Abstract row / Part association.
     abstractItemId: str = ""
 
     description: str = ""
@@ -117,6 +117,12 @@ class ProductLine(BaseModel):
     quantity: float = 0
     unitPrice: float = 0
     gstRate: float = 0
+
+    # NEW: Optional manually editable amount.
+    # None = Automatically calculate quantity * unitPrice.
+    # Number = Use the manually entered amount.
+    amount: float | None = Field(default=None, ge=0)
+
     customValues: dict[
         str,
         str | int | float,
@@ -130,7 +136,10 @@ class QuotationTheme(BaseModel):
     secondaryColor: str = "#f5f5f5"
 
 
+
 class QuotationData(BaseModel):
+    gstEnabled: bool = False
+
     templateId: TemplateId = "classic"
     theme: QuotationTheme = Field(
         default_factory=QuotationTheme

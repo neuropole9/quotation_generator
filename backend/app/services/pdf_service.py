@@ -522,7 +522,7 @@ def _column_text(
         == "gstRate"
     ):
         return (
-            f"{float(product.gstRate or 0):g}%"
+            f"{GLOBAL_GST_RATE:g}%"
         )
 
     if (
@@ -1384,63 +1384,27 @@ def _build_abstract_page(
     )
 
     abstract_gst = (
-        abstract_total
-        * GLOBAL_GST_RATE
-        / 100
+        abstract_total * GLOBAL_GST_RATE / 100
+        if data.gstEnabled else 0.0
     )
     abstract_total_including_gst = (
         abstract_total
         + abstract_gst
     )
 
-    abstract_rows.extend(
-        [
-            [
-                Paragraph(
-                    "<b>Subtotal</b>",
-                    body_right,
-                ),
-                "",
-                "",
-                Paragraph(
-                    (
-                        "<b>"
-                        f"{plain_amount(abstract_total)}"
-                        "</b>"
-                    ),
-                    body_right,
-                ),
-            ],
-            [
-                Paragraph(
-                    f"GST {GLOBAL_GST_RATE:g}%",
-                    body_right,
-                ),
-                "",
-                "",
-                Paragraph(
-                    plain_amount(abstract_gst),
-                    body_right,
-                ),
-            ],
-            [
-                Paragraph(
-                    "<b>Grand Total</b>",
-                    body_right,
-                ),
-                "",
-                "",
-                Paragraph(
-                    (
-                        "<b>"
-                        f"{plain_amount(abstract_total_including_gst)}"
-                        "</b>"
-                    ),
-                    body_right,
-                ),
-            ],
-        ]
-    )
+    abstract_rows.append([
+        Paragraph("<b>Subtotal</b>", body_right), "", "",
+        Paragraph(f"<b>{plain_amount(abstract_total)}</b>", body_right),
+    ])
+    if data.gstEnabled:
+        abstract_rows.append([
+            Paragraph(f"GST {GLOBAL_GST_RATE:g}%", body_right), "", "",
+            Paragraph(plain_amount(abstract_gst), body_right),
+        ])
+    abstract_rows.append([
+        Paragraph("<b>Grand Total</b>", body_right), "", "",
+        Paragraph(f"<b>{plain_amount(abstract_total_including_gst)}</b>", body_right),
+    ])
 
     abstract_table = Table(
         abstract_rows,
@@ -1467,14 +1431,14 @@ def _build_abstract_page(
                 (
                     "INNERGRID",
                     (0, 0),
-                    (-1, -4),
+                    (-1, -(3 if data.gstEnabled else 2)),
                     0.6,
                     MID_GRAY,
                 ),
                 # Strong separator between the item rows and totals.
                 (
                     "LINEABOVE",
-                    (0, -3),
+                    (0, -(3 if data.gstEnabled else 2)),
                     (-1, -3),
                     0.8,
                     BLACK,
@@ -1482,7 +1446,7 @@ def _build_abstract_page(
                 # Separate Excl. GST from the GST row.
                 (
                     "LINEBELOW",
-                    (0, -3),
+                    (0, -(3 if data.gstEnabled else 2)),
                     (-1, -3),
                     0.65,
                     MID_GRAY,
@@ -1498,15 +1462,15 @@ def _build_abstract_page(
                 # Keep a visible divider between the total label and amount.
                 (
                     "LINEBEFORE",
-                    (3, -3),
+                    (3, -(3 if data.gstEnabled else 2)),
                     (3, -1),
                     0.65,
                     MID_GRAY,
                 ),
                 (
                     "SPAN",
-                    (0, -3),
-                    (2, -3),
+                    (0, -(3 if data.gstEnabled else 2)),
+                    (2, -(3 if data.gstEnabled else 2)),
                 ),
                 (
                     "SPAN",
@@ -1520,7 +1484,7 @@ def _build_abstract_page(
                 ),
                 (
                     "ALIGN",
-                    (0, -3),
+                    (0, -(3 if data.gstEnabled else 2)),
                     (2, -1),
                     "RIGHT",
                 ),
@@ -2077,11 +2041,8 @@ def _calculate_detail_totals(
     )
 
     gst_amount = (
-        subtotal
-        *
-        GLOBAL_GST_RATE
-        /
-        100
+        subtotal * GLOBAL_GST_RATE / 100
+        if data.gstEnabled else 0.0
     )
 
     grand_total = (
@@ -2110,50 +2071,19 @@ def _build_detail_totals(
         data,
     )
 
-    rows = [
-        [
-            Paragraph(
-                "<b>Subtotal</b>",
-                body_right,
-            ),
-            Paragraph(
-                money(
-                    subtotal,
-                ),
-                body_right,
-            ),
-        ],
-        [
-            Paragraph(
-                (
-                    "<b>"
-                    f"GST {GLOBAL_GST_RATE:g}%"
-                    "</b>"
-                ),
-                body_right,
-            ),
-            Paragraph(
-                money(
-                    gst_amount,
-                ),
-                body_right,
-            ),
-        ],
-        [
-            Paragraph(
-                "<b>Grand Total</b>",
-                body_right,
-            ),
-            Paragraph(
-                (
-                    "<b>"
-                    f"{money(grand_total)}"
-                    "</b>"
-                ),
-                body_right,
-            ),
-        ],
-    ]
+    rows = [[
+        Paragraph("<b>Subtotal</b>", body_right),
+        Paragraph(money(subtotal), body_right),
+    ]]
+    if data.gstEnabled:
+        rows.append([
+            Paragraph(f"<b>GST {GLOBAL_GST_RATE:g}%</b>", body_right),
+            Paragraph(money(gst_amount), body_right),
+        ])
+    rows.append([
+        Paragraph("<b>Grand Total</b>", body_right),
+        Paragraph(f"<b>{money(grand_total)}</b>", body_right),
+    ])
 
     totals_table = Table(
         rows,
@@ -3292,9 +3222,10 @@ def _build_detail_pages(
         in data.columns
         if (
             column.visible
-            and
-            column.kind
-            != "gstRate"
+            and (
+                column.kind != "gstRate"
+                or data.gstEnabled
+            )
         )
     ]
 

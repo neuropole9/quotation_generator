@@ -1,6 +1,15 @@
 from app.models.quotation import ProductLine
 
+#def line_base(product: ProductLine) -> float:
+    #return max(0.0, product.quantity) * max(0.0, product.unitPrice)
+
+
 def line_base(product: ProductLine) -> float:
+    manual_amount = getattr(product, "amount", None)
+
+    if manual_amount is not None:
+        return max(0.0, float(manual_amount))
+
     return max(0.0, product.quantity) * max(0.0, product.unitPrice)
 
 def line_tax(product: ProductLine) -> float:
