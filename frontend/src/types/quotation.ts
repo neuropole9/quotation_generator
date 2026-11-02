@@ -54,7 +54,13 @@ export interface ProjectDetails {
   moduleDot: string;
 }
 
+export interface AbstractColumn {
+  id: string;
+  label: string;
+}
+
 export interface QuotationAbstractLine {
+  customValues?: Record<string, string>;
   id: string;
   description: string;
   price: number;
@@ -133,6 +139,7 @@ export interface QuotationData {
   quote: QuoteDetails;
   project: ProjectDetails;
   abstractItems: QuotationAbstractLine[];
+  abstractColumns?: AbstractColumn[];
   products: ProductLine[];
   notes: string;
   gstEnabled?: boolean;

@@ -1292,131 +1292,63 @@ def _build_abstract_page(
         )
     )
 
-    abstract_rows = [
-        [
-            Paragraph(
-                "<b>SL.NO</b>",
-                body_center,
-            ),
-            Paragraph(
-                "<b>PARTS</b>",
-                body_center,
-            ),
-            Paragraph(
-                "<b>DESCRIPTION</b>",
-                body_center,
-            ),
-            Paragraph(
-                "<b>PRICE</b>",
-                body_center,
-            ),
-        ]
+    default_columns = [
+        ("serial", "SL.NO"),
+        ("parts", "PARTS"),
+        ("description", "DESCRIPTION"),
+        ("price", "PRICE"),
     ]
+    supplied = {column.id: column.label for column in data.abstractColumns}
+    extra_columns = [(c.id, c.label) for c in data.abstractColumns
+                     if c.id not in {"serial", "parts", "description", "price"}]
+    column_defs = [(key, supplied.get(key, label)) for key, label in default_columns] + extra_columns
+    price_idx = 3
+    last_idx = len(column_defs) - 1
+    abstract_rows = [[Paragraph("<b>" + html.escape(label or " ") + "</b>", body_center)
+                      for _, label in column_defs]]
 
-    for (
-        index,
-        item,
-    ) in enumerate(
-        data.abstractItems,
-        start=1,
-    ):
-        abstract_rows.append(
-            [
-                Paragraph(
-                    str(index),
-                    body_center,
-                ),
-                Paragraph(
-                    (
-                        "<b>"
-                        f"{part_letter_label(index - 1)}"
-                        "</b>"
-                    ),
-                    body_center,
-                ),
-                Paragraph(
-                    safe_text(
-                        item.description,
-                    ).replace(
-                        "\n",
-                        "<br/>",
-                    ),
-                    body,
-                ),
-                Paragraph(
-                    plain_amount(
-                        item.price,
-                    ),
-                    body_right,
-                ),
-            ]
-        )
+    for index, item in enumerate(data.abstractItems, start=1):
+        values = {
+            "serial": str(index),
+            "parts": part_letter_label(index - 1),
+            "description": item.description,
+            "price": plain_amount(item.price),
+            **(item.customValues or {}),
+        }
+        abstract_rows.append([
+            Paragraph(html.escape(str(values.get(key, ""))).replace("\n", "<br/>"),
+                      body_right if key == "price" else body_center if key in {"serial", "parts"} else body)
+            for key, _ in column_defs
+        ])
 
     if not data.abstractItems:
-        abstract_rows.append(
-            [
-                Paragraph(
-                    "1",
-                    body_center,
-                ),
-                Paragraph(
-                    "<b>PART A</b>",
-                    body_center,
-                ),
-                Paragraph(
-                    "—",
-                    body,
-                ),
-                Paragraph(
-                    "0.00",
-                    body_right,
-                ),
-            ]
-        )
-
-    abstract_total = sum(
-        float(
-            item.price
-            or 0
-        )
-        for item
-        in data.abstractItems
-    )
-
-    abstract_gst = (
-        abstract_total * GLOBAL_GST_RATE / 100
-        if data.gstEnabled else 0.0
-    )
-    abstract_total_including_gst = (
-        abstract_total
-        + abstract_gst
-    )
-
-    abstract_rows.append([
-        Paragraph("<b>Subtotal</b>", body_right), "", "",
-        Paragraph(f"<b>{plain_amount(abstract_total)}</b>", body_right),
-    ])
-    if data.gstEnabled:
         abstract_rows.append([
-            Paragraph(f"GST {GLOBAL_GST_RATE:g}%", body_right), "", "",
-            Paragraph(plain_amount(abstract_gst), body_right),
+            Paragraph("0.00" if key == "price" else "—", body_right if key == "price" else body)
+            for key, _ in column_defs
         ])
-    abstract_rows.append([
-        Paragraph("<b>Grand Total</b>", body_right), "", "",
-        Paragraph(f"<b>{plain_amount(abstract_total_including_gst)}</b>", body_right),
-    ])
 
-    abstract_table = Table(
-        abstract_rows,
-        colWidths=[
-            14 * mm,
-            22 * mm,
-            CONTENT_WIDTH
-            - 71 * mm,
-            35 * mm,
-        ],
-        repeatRows=1,
-    )
+    abstract_total = sum(float(item.price or 0) for item in data.abstractItems)
+    abstract_gst = abstract_total * GLOBAL_GST_RATE / 100 if data.gstEnabled else 0.0
+    abstract_total_including_gst = abstract_total + abstract_gst
+    # Monetary totals always remain in the Price column regardless of custom columns.
+    for label, value in ([('Subtotal', abstract_total)] +
+                         ([('GST ' + f'{GLOBAL_GST_RATE:g}%', abstract_gst)] if data.gstEnabled else []) +
+                         [('Grand Total', abstract_total_including_gst)]):
+        row = [""] * len(column_defs)
+        row[0] = Paragraph("<b>" + html.escape(label) + "</b>", body_right)
+        row[price_idx] = Paragraph("<b>" + plain_amount(value) + "</b>", body_right)
+        abstract_rows.append(row)
+
+    # Reserve a usable minimum width for each additional column.
+    widths = [14 * mm, 22 * mm, 35 * mm]  # serial, parts, price
+    custom_width = 23 * mm
+    description_width = max(35 * mm, CONTENT_WIDTH - sum(widths) - len(extra_columns) * custom_width)
+    col_widths = [widths[0], widths[1], description_width, widths[2]] + [custom_width] * len(extra_columns)
+    # Reduce widths proportionally if the requested custom columns exceed the page width.
+    if sum(col_widths) > CONTENT_WIDTH:
+        ratio = CONTENT_WIDTH / sum(col_widths)
+        col_widths = [w * ratio for w in col_widths]
+    abstract_table = Table(abstract_rows, colWidths=col_widths, repeatRows=1)
 
     abstract_table.setStyle(
         TableStyle(
@@ -1462,8 +1394,8 @@ def _build_abstract_page(
                 # Keep a visible divider between the total label and amount.
                 (
                     "LINEBEFORE",
-                    (3, -(3 if data.gstEnabled else 2)),
-                    (3, -1),
+                    (price_idx, -(3 if data.gstEnabled else 2)),
+                    (price_idx, -1),
                     0.65,
                     MID_GRAY,
                 ),

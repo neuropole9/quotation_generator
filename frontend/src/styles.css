@@ -10641,3 +10641,15 @@ body:has(.builder-layout--form-only)
   padding-right: 24px !important;
 }
 
+
+/* Editable Abstract Table columns */
+.abstract-column-controls { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.abstract-table-scroll { overflow-x:auto; width:100%; }
+.abstract-table-scroll .abstract-editor-header,
+.abstract-table-scroll .abstract-editor-row { min-width:max-content; grid-template-columns:unset; }
+
+.abstract-column-heading { display:flex; align-items:center; gap:3px; padding:4px; border-right:1px solid #c9cdd3; border-bottom:1px solid #c9cdd3; min-width:0; }
+.abstract-column-heading input { min-width:0; width:100%; padding:6px 4px; border:1px solid #d7dbe1; background:white; border-radius:3px; font-size:12px; font-weight:600; }
+.abstract-column-heading button { flex-shrink:0; border:0; color:#b91c1c; background:transparent; cursor:pointer; font-size:18px; }
+
+.abstract-table-scroll .abstract-editor-header, .abstract-table-scroll .abstract-editor-row { grid-template-columns: var(--abstract-columns) !important; }

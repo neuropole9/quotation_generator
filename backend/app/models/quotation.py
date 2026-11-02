@@ -80,7 +80,13 @@ class ProjectDetails(BaseModel):
     moduleDot: str = ""
 
 
+class AbstractColumn(BaseModel):
+    id: str
+    label: str
+
+
 class QuotationAbstractLine(BaseModel):
+    customValues: dict[str, str] = Field(default_factory=dict)
     id: str
     description: str = ""
     price: float = 0
@@ -159,6 +165,7 @@ class QuotationData(BaseModel):
     project: ProjectDetails = Field(
         default_factory=ProjectDetails
     )
+    abstractColumns: list[AbstractColumn] = Field(default_factory=list)
     abstractItems: list[
         QuotationAbstractLine
     ] = Field(
