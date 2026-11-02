@@ -69,34 +69,11 @@ const isModelColumn = (
 
 const displayColumnLabel = (
   column: QuotationColumn,
-) => {
-  if (
-    isModelColumn(
-      column,
-    )
-  ) {
-    return "Model Number";
-  }
-
-  if (
-    column.kind ===
-    "unitPrice"
-  ) {
-    return "Price";
-  }
-
-  if (
-    column.kind ===
-    "amount"
-  ) {
-    return "Total";
-  }
-
-  return (
-    column.label ||
-    "Column"
-  );
-};
+) => column.label || (
+  isModelColumn(column) ? "Model Number" :
+  column.kind === "unitPrice" ? "Price" :
+  column.kind === "amount" ? "Total" : "Column"
+);
 
 export default function ProductEditor({
   products,
@@ -567,11 +544,6 @@ export default function ProductEditor({
                   className="column-label-input"
                   value={
                     displayColumnLabel(
-                      column,
-                    )
-                  }
-                  readOnly={
-                    isModelColumn(
                       column,
                     )
                   }

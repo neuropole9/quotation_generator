@@ -364,26 +364,15 @@ def _is_model_column(
 def _display_column_label(
     column: QuotationColumn,
 ) -> str:
-    if _is_model_column(
-        column
-    ):
-        return "MODEL NUMBER"
-
-    if (
-        column.kind
-        == "unitPrice"
-    ):
-        return "PRICE"
-
-    if (
-        column.kind
-        == "amount"
-    ):
-        return "TOTAL"
-
+    """Use the user-facing label, not the field's internal kind."""
     return (
         column.label
-        or "Column"
+        or (
+            "Model Number" if _is_model_column(column)
+            else "Price" if column.kind == "unitPrice"
+            else "Total" if column.kind == "amount"
+            else "Column"
+        )
     )
 
 
@@ -3171,7 +3160,7 @@ def _build_detail_pages(
                 id=
                     column.id,
                 label=
-                    "Model Number",
+                    column.label if column.label and column.label != "Image" else "Model Number",
                 kind=
                     "modelNumber",
                 visible=True,
