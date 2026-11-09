@@ -29,6 +29,7 @@ DESCRIPTION_HEADERS = {
     "itemdescription",
     "details",
     "particulars",
+    "descriptionoftheitem",  # Generated Product BOQ heading
 }
 
 UNIT_HEADERS = {
@@ -46,6 +47,8 @@ PRICE_HEADERS = {
     "rate",
     "unitprice",
     "unitrate",
+    "price(inrs)",  # Generated Abstract / BOQ heading
+    "rate(inrs)",
 }
 
 TOTAL_HEADERS = {
@@ -53,6 +56,7 @@ TOTAL_HEADERS = {
     "amount",
     "lineamount",
     "linetotal",
+    "total(inrs)",  # Generated BOQ heading
 }
 
 SERIAL_HEADERS = {
