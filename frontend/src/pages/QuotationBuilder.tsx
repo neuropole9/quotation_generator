@@ -706,10 +706,10 @@ const createEmptyData = (
 
 
   abstractColumns: [
-    { id: "serial", label: "S.No" },
-    { id: "parts", label: "Parts" },
-    { id: "description", label: "Description" },
-    { id: "price", label: "Price" },
+    { id: "serial", label: "S.No", visible: true },
+    { id: "parts", label: "Parts", visible: true },
+    { id: "description", label: "Description", visible: true },
+    { id: "price", label: "Price", visible: true },
   ],
   abstractItems: [
 
@@ -1308,14 +1308,23 @@ const normalizeQuotationForSave = (value: QuotationData): QuotationData => ({
   products: Array.isArray(value.products) ? value.products : [],
   columns: Array.isArray(value.columns) ? value.columns : [],
   abstractItems: Array.isArray(value.abstractItems) ? value.abstractItems : [],
-  abstractColumns: Array.isArray(value.abstractColumns) && value.abstractColumns.length >= 4
-    ? value.abstractColumns
-    : [
-        { id: "serial", label: "S.No" },
-        { id: "parts", label: "Parts" },
-        { id: "description", label: "Description" },
-        { id: "price", label: "Price" },
-      ],
+  abstractColumns: (() => {
+    const defaults = [
+      { id: "serial", label: "S.No", visible: true },
+      { id: "parts", label: "Parts", visible: true },
+      { id: "description", label: "Description", visible: true },
+      { id: "price", label: "Price", visible: true },
+    ];
+    const supplied = Array.isArray(value.abstractColumns) ? value.abstractColumns : [];
+    const existing = new Map(supplied.map(column => [column.id, column]));
+    const columns = [
+      ...defaults.map(column => ({ ...column, ...(existing.get(column.id) ?? {}) })),
+      ...supplied.filter(column => !defaults.some(base => base.id === column.id)),
+    ].map(column => ({ ...column, visible: column.visible !== false }));
+    return columns.some(column => column.visible)
+      ? columns
+      : columns.map((column, index) => index === 0 ? { ...column, visible: true } : column);
+  })(),
   terms: Array.isArray(value.terms) ? value.terms : createDefaultTerms(),
 });
 
@@ -1734,17 +1743,8 @@ export default function QuotationBuilder({
 
           ),
 
-        abstractItems:
-
-          currentData.abstractItems.filter(
-
-            (item) =>
-
-              item.description
-
-                .trim(),
-
-          ),
+        // Part associations must remain intact, including unnamed parts.
+        abstractItems: currentData.abstractItems,
 
       }),
 
@@ -6437,78 +6437,104 @@ export default function QuotationBuilder({
                 onClick={() => setData(previous => ({
                   ...previous,
                   abstractColumns: [
-                    ...(previous.abstractColumns?.length ? previous.abstractColumns : [
-                      { id: "serial", label: "S.No" },
-                      { id: "parts", label: "Parts" },
-                      { id: "description", label: "Description" },
-                      { id: "price", label: "Price" },
-                    ]),
-                    { id: crypto.randomUUID(), label: "New Column" },
+                    ...normalizeQuotationForSave(previous).abstractColumns!,
+                    { id: crypto.randomUUID(), label: "New Column", visible: true },
                   ],
                 }))}
               >
                 + Add Column
               </button>
             </div>
-            <div className="abstract-table-scroll">
-              <div className="abstract-editor-header" style={{ "--abstract-columns": `64px 88px minmax(180px, 1fr) 150px ${"150px ".repeat(Math.max(0, (currentData.abstractColumns?.length ?? 4) - 4))} 86px` } as CSSProperties}>
-                {(currentData.abstractColumns?.length ? currentData.abstractColumns : [
-                  { id: "serial", label: "S.No" },
-                  { id: "parts", label: "Parts" },
-                  { id: "description", label: "Description" },
-                  { id: "price", label: "Price" },
-                ]).map(column => (
-                  <div className="abstract-column-heading" key={column.id}>
-                    <input
-                      aria-label={`Rename ${column.label} column`}
-                      value={column.label}
-                      onChange={event => setData(previous => ({
+            <div className="abstract-visibility-controls" aria-label="Choose Abstract Table columns">
+              {currentData.abstractColumns?.map(column => (
+                <label key={column.id} className="abstract-visibility-option">
+                  <input
+                    type="checkbox"
+                    checked={column.visible !== false}
+                    onChange={event => setData(previous => {
+                      const columns = normalizeQuotationForSave(previous).abstractColumns!;
+                      if (!event.target.checked && columns.filter(existing => existing.visible !== false).length <= 1) {
+                        return previous; // Keep one visible column so the table can render.
+                      }
+                      return {
                         ...previous,
-                        abstractColumns: (previous.abstractColumns?.length ? previous.abstractColumns : [
-                          { id: "serial", label: "S.No" },
-                          { id: "parts", label: "Parts" },
-                          { id: "description", label: "Description" },
-                          { id: "price", label: "Price" },
-                        ]).map(existing => existing.id === column.id
-                          ? { ...existing, label: event.target.value } : existing),
-                      }))}
-                    />
-                    {!['serial', 'parts', 'description', 'price'].includes(column.id) && (
-                      <button type="button" aria-label={`Remove ${column.label} column`}
-                        onClick={() => setData(previous => ({
-                          ...previous,
-                          abstractColumns: previous.abstractColumns?.filter(existing => existing.id !== column.id),
-                          abstractItems: previous.abstractItems.map(item => {
-                            const customValues = { ...item.customValues };
-                            delete customValues[column.id];
-                            return { ...item, customValues };
-                          }),
-                        }))}>×</button>
-                    )}
-                  </div>
-                ))}
-                <span>Action</span>
-              </div>
-              {currentData.abstractItems.map((item, index) => (
-                <div className="abstract-editor-row" key={item.id}
-                  style={{ "--abstract-columns": `64px 88px minmax(180px, 1fr) 150px ${"150px ".repeat(Math.max(0, (currentData.abstractColumns?.length ?? 4) - 4))} 86px` } as CSSProperties}>
-                  <span className="abstract-serial">{index + 1}</span>
-                  <span className="abstract-part-label">{getPartLetterLabel(index)}</span>
-                  <input value={item.description} placeholder="Description"
-                    onChange={event => updateAbstractItem(item.id, { description: event.target.value })} />
-                  <input type="number" min="0" step="0.01" value={item.price}
-                    onChange={event => updateAbstractItem(item.id, { price: Number(event.target.value) })} />
-                  {(currentData.abstractColumns ?? []).filter(column => !['serial', 'parts', 'description', 'price'].includes(column.id)).map(column => (
-                    <input key={column.id} aria-label={`${column.label} for row ${index + 1}`}
-                      value={item.customValues?.[column.id] ?? ''}
-                      onChange={event => updateAbstractItem(item.id, {
-                        customValues: { ...item.customValues, [column.id]: event.target.value },
-                      })} />
-                  ))}
-                  <button type="button" className="text-button danger"
-                    onClick={() => removeAbstractItem(item.id)}>Remove</button>
-                </div>
+                        abstractColumns: columns.map(existing => existing.id === column.id
+                          ? { ...existing, visible: event.target.checked }
+                          : existing),
+                      };
+                    })}
+                  />
+                  <span>{column.label || "Untitled Column"}</span>
+                </label>
               ))}
+            </div>
+            <div className="abstract-table-scroll">
+              {(() => {
+                const visibleColumns = (currentData.abstractColumns ?? []).filter(column => column.visible !== false);
+                const widthForColumn = (id: string) =>
+                  id === "serial" ? "64px" : id === "parts" ? "88px"
+                  : id === "description" ? "minmax(180px, 1fr)"
+                  : "150px";
+                const columnLayout = `${visibleColumns.map(column => widthForColumn(column.id)).join(" ")} 86px`;
+                return <>
+                  <div className="abstract-editor-header" style={{ "--abstract-columns": columnLayout } as CSSProperties}>
+                    {visibleColumns.map(column => (
+                      <div className="abstract-column-heading" key={column.id}>
+                        <input
+                          aria-label={`Rename ${column.label} column`}
+                          value={column.label}
+                          onChange={event => setData(previous => ({
+                            ...previous,
+                            abstractColumns: normalizeQuotationForSave(previous).abstractColumns!.map(existing => existing.id === column.id
+                              ? { ...existing, label: event.target.value } : existing),
+                          }))}
+                        />
+                        {!['serial', 'parts', 'description', 'price'].includes(column.id) && (
+                          <button type="button" aria-label={`Remove ${column.label} column`}
+                            onClick={() => setData(previous => ({
+                              ...previous,
+                              abstractColumns: previous.abstractColumns?.filter(existing => existing.id !== column.id),
+                              abstractItems: previous.abstractItems.map(item => {
+                                const customValues = { ...item.customValues };
+                                delete customValues[column.id];
+                                return { ...item, customValues };
+                              }),
+                            }))}>×</button>
+                        )}
+                      </div>
+                    ))}
+                    <span>Action</span>
+                  </div>
+                  {currentData.abstractItems.map((item, index) => (
+                    <div className="abstract-editor-row" key={item.id}
+                      style={{ "--abstract-columns": columnLayout } as CSSProperties}>
+                      {visibleColumns.map(column => {
+                        if (column.id === "serial") {
+                          return <span key={column.id} className="abstract-serial">{index + 1}</span>;
+                        }
+                        if (column.id === "parts") {
+                          return <span key={column.id} className="abstract-part-label">{getPartLetterLabel(index)}</span>;
+                        }
+                        if (column.id === "description") {
+                          return <input key={column.id} value={item.description} placeholder="Description"
+                            onChange={event => updateAbstractItem(item.id, { description: event.target.value })} />;
+                        }
+                        if (column.id === "price") {
+                          return <input key={column.id} type="number" min="0" step="0.01" value={item.price}
+                            onChange={event => updateAbstractItem(item.id, { price: Number(event.target.value) })} />;
+                        }
+                        return <input key={column.id} aria-label={`${column.label} for row ${index + 1}`}
+                          value={item.customValues?.[column.id] ?? ''}
+                          onChange={event => updateAbstractItem(item.id, {
+                            customValues: { ...item.customValues, [column.id]: event.target.value },
+                          })} />;
+                      })}
+                      <button type="button" className="text-button danger"
+                        onClick={() => removeAbstractItem(item.id)}>Remove</button>
+                    </div>
+                  ))}
+                </>;
+              })()}
             </div>
 
             <div className="abstract-editor-footer">
@@ -6610,7 +6636,9 @@ export default function QuotationBuilder({
 
           title="06 — Detailed Item Details"
 
-          description="Each Abstract row becomes a Part. Upload a PDF or add/edit products manually inside the required Part."
+          description={currentData.abstractColumns?.find(column => column.id === "parts")?.visible === false
+            ? "Products are displayed in one table. Enable the Parts column in Abstract to restore separate Part tables."
+            : "Each Abstract row becomes a Part. Upload a PDF or add/edit products manually inside the required Part."}
 
         >
 
@@ -6632,8 +6660,38 @@ export default function QuotationBuilder({
             Enable GST (18%) for this quotation
           </label>
           <div className="parts-editor">
-
-            {currentData.abstractItems.map(
+            {/* Parts visibility controls presentation only; stored associations are preserved. */}
+            {currentData.abstractColumns?.find(column => column.id === "parts")?.visible === false ? (
+              <div className="part-product-card">
+                <div className="part-product-card__header">
+                  <div>
+                    <h3>Products BOQ</h3>
+                    <p>All products in one table. Enable Parts in the Abstract Table to restore groups.</p>
+                  </div>
+                  <button type="button" className="secondary-button" onClick={() => {
+                    setPdfImportPartId(currentData.abstractItems[0]?.id ?? null);
+                    setShowPdfImport(true);
+                  }}>Upload Product PDF</button>
+                </div>
+                <ProductEditor
+                  gstEnabled={currentData.gstEnabled ?? false}
+                  products={currentData.products}
+                  columns={currentData.columns}
+                  onChange={products => setData(previous => {
+                    const knownPartIds = new Map(previous.products.map(product => [product.id, product.abstractItemId]));
+                    const defaultPartId = previous.abstractItems[0]?.id ?? "";
+                    return {
+                      ...previous,
+                      products: products.map(product => ({
+                        ...product,
+                        abstractItemId: knownPartIds.get(product.id) ?? defaultPartId,
+                      })),
+                    };
+                  })}
+                  onColumnsChange={columns => setData(previous => ({ ...previous, columns }))}
+                />
+              </div>
+            ) : currentData.abstractItems.map(
 
               (
 

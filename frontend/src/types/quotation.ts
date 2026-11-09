@@ -10,11 +10,7 @@ export interface CompanyDetails {
   logoDataUrl: string;
   footerLine1: string;
   footerLine2: string;
-
-  // Digital signature shown on the final Terms & Conditions page.
   signatureImageDataUrl: string;
-
-  // Editable bank details shown on the final Terms & Conditions page.
   accountName: string;
   accountDetails: string;
   ifscCode: string;
@@ -57,6 +53,7 @@ export interface ProjectDetails {
 export interface AbstractColumn {
   id: string;
   label: string;
+  visible?: boolean; // Optional for previously saved quotations.
 }
 
 export interface QuotationAbstractLine {
@@ -76,7 +73,7 @@ export interface QuotationTerm {
 export type QuotationColumnKind =
   | "serial"
   | "modelNumber"
-  | "image" // legacy compatibility: rendered as Model Number
+  | "image"
   | "description"
   | "unit"
   | "quantity"
@@ -96,26 +93,9 @@ export interface QuotationColumn {
 
 export interface ProductLine {
   id: string;
-
-  /**
-   * New visible product field.
-   * The old image column is retained only for backward compatibility.
-   */
   modelNumber?: string;
-
-  /**
-   * Legacy field. Existing saved/imported data can still contain it,
-   * but the quotation table no longer displays a product image column.
-   */
   imageDataUrl?: string;
-
-  /**
-   * Links this product to one Abstract row.
-   * Product Details uses the Abstract row as its Part heading.
-   * Older products without this value are treated as Part 1.
-   */
   abstractItemId?: string;
-
   description: string;
   unit: string;
   quantity: number;
@@ -143,10 +123,6 @@ export interface QuotationData {
   products: ProductLine[];
   notes: string;
   gstEnabled?: boolean;
-
-  /** Selectable Terms & Conditions used by the new editor/PDF. */
   terms?: QuotationTerm[];
-
-  /** Legacy free-text field kept for backward compatibility. */
   termsAndConditions: string;
 }

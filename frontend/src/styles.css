@@ -10653,3 +10653,21 @@ body:has(.builder-layout--form-only)
 .abstract-column-heading button { flex-shrink:0; border:0; color:#b91c1c; background:transparent; cursor:pointer; font-size:18px; }
 
 .abstract-table-scroll .abstract-editor-header, .abstract-table-scroll .abstract-editor-row { grid-template-columns: var(--abstract-columns) !important; }
+
+/* Abstract column visibility: independent of editable heading names. */
+.abstract-visibility-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 18px;
+  padding: 12px 2px 14px;
+}
+.abstract-visibility-option {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #303642;
+  cursor: pointer;
+}
+.abstract-visibility-option input { width: 15px; height: 15px; }

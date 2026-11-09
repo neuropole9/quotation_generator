@@ -1287,15 +1287,25 @@ def _build_abstract_page(
         ("description", "DESCRIPTION"),
         ("price", "PRICE"),
     ]
-    supplied = {column.id: column.label for column in data.abstractColumns}
-    extra_columns = [(c.id, c.label) for c in data.abstractColumns
-                     if c.id not in {"serial", "parts", "description", "price"}]
-    column_defs = [(key, supplied.get(key, label)) for key, label in default_columns] + extra_columns
-    price_idx = 3
-    last_idx = len(column_defs) - 1
-    abstract_rows = [[Paragraph("<b>" + html.escape(label or " ") + "</b>", body_center)
-                      for _, label in column_defs]]
+    supplied = {column.id: column for column in data.abstractColumns}
+    all_columns = [
+        (key, supplied[key].label if key in supplied else label,
+         supplied[key].visible if key in supplied else True)
+        for key, label in default_columns
+    ] + [
+        (column.id, column.label, column.visible)
+        for column in data.abstractColumns
+        if column.id not in {"serial", "parts", "description", "price"}
+    ]
+    column_defs = [(key, label) for key, label, visible in all_columns if visible]
+    # Old quotations have no visible property; Pydantic defaults it to True.
+    if not column_defs:
+        column_defs = [("serial", "SL.NO")]
 
+    abstract_rows = [[
+        Paragraph("<b>" + html.escape(label or " ") + "</b>", body_center)
+        for _, label in column_defs
+    ]]
     for index, item in enumerate(data.abstractItems, start=1):
         values = {
             "serial": str(index),
@@ -1312,158 +1322,62 @@ def _build_abstract_page(
 
     if not data.abstractItems:
         abstract_rows.append([
-            Paragraph("0.00" if key == "price" else "—", body_right if key == "price" else body)
+            Paragraph("0.00" if key == "price" else "—",
+                      body_right if key == "price" else body)
             for key, _ in column_defs
         ])
 
     abstract_total = sum(float(item.price or 0) for item in data.abstractItems)
     abstract_gst = abstract_total * GLOBAL_GST_RATE / 100 if data.gstEnabled else 0.0
     abstract_total_including_gst = abstract_total + abstract_gst
-    # Monetary totals always remain in the Price column regardless of custom columns.
-    for label, value in ([('Subtotal', abstract_total)] +
-                         ([('GST ' + f'{GLOBAL_GST_RATE:g}%', abstract_gst)] if data.gstEnabled else []) +
-                         [('Grand Total', abstract_total_including_gst)]):
-        row = [""] * len(column_defs)
-        row[0] = Paragraph("<b>" + html.escape(label) + "</b>", body_right)
-        row[price_idx] = Paragraph("<b>" + plain_amount(value) + "</b>", body_right)
-        abstract_rows.append(row)
 
-    # Reserve a usable minimum width for each additional column.
-    widths = [14 * mm, 22 * mm, 35 * mm]  # serial, parts, price
-    custom_width = 23 * mm
-    description_width = max(35 * mm, CONTENT_WIDTH - sum(widths) - len(extra_columns) * custom_width)
-    col_widths = [widths[0], widths[1], description_width, widths[2]] + [custom_width] * len(extra_columns)
-    # Reduce widths proportionally if the requested custom columns exceed the page width.
-    if sum(col_widths) > CONTENT_WIDTH:
-        ratio = CONTENT_WIDTH / sum(col_widths)
-        col_widths = [w * ratio for w in col_widths]
+    base_widths = {"serial": 14 * mm, "parts": 22 * mm,
+                   "description": 60 * mm, "price": 35 * mm}
+    col_widths = [base_widths.get(key, 23 * mm) for key, _ in column_defs]
+    total_width = sum(col_widths)
+    col_widths = [CONTENT_WIDTH * width / total_width for width in col_widths]
     abstract_table = Table(abstract_rows, colWidths=col_widths, repeatRows=1)
+    abstract_table.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.7, MID_GRAY),
+        ("INNERGRID", (0, 0), (-1, -1), 0.6, MID_GRAY),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("BACKGROUND", (0, 0), (-1, -1), WHITE),
+    ]))
 
-    abstract_table.setStyle(
-        TableStyle(
-            [
-                (
-                    "BOX",
-                    (0, 0),
-                    (-1, -1),
-                    0.7,
-                    MID_GRAY,
-                ),
-                (
-                    "INNERGRID",
-                    (0, 0),
-                    (-1, -(3 if data.gstEnabled else 2)),
-                    0.6,
-                    MID_GRAY,
-                ),
-                # Strong separator between the item rows and totals.
-                (
-                    "LINEABOVE",
-                    (0, -(3 if data.gstEnabled else 2)),
-                    (-1, -3),
-                    0.8,
-                    BLACK,
-                ),
-                # Separate Excl. GST from the GST row.
-                (
-                    "LINEBELOW",
-                    (0, -(3 if data.gstEnabled else 2)),
-                    (-1, -3),
-                    0.65,
-                    MID_GRAY,
-                ),
-                # Separate the GST row from the final Incl. GST total.
-                (
-                    "LINEBELOW",
-                    (0, -2),
-                    (-1, -2),
-                    0.8,
-                    BLACK,
-                ),
-                # Keep a visible divider between the total label and amount.
-                (
-                    "LINEBEFORE",
-                    (price_idx, -(3 if data.gstEnabled else 2)),
-                    (price_idx, -1),
-                    0.65,
-                    MID_GRAY,
-                ),
-                (
-                    "SPAN",
-                    (0, -(3 if data.gstEnabled else 2)),
-                    (2, -(3 if data.gstEnabled else 2)),
-                ),
-                (
-                    "SPAN",
-                    (0, -2),
-                    (2, -2),
-                ),
-                (
-                    "SPAN",
-                    (0, -1),
-                    (2, -1),
-                ),
-                (
-                    "ALIGN",
-                    (0, -(3 if data.gstEnabled else 2)),
-                    (2, -1),
-                    "RIGHT",
-                ),
-                (
-                    "ALIGN",
-                    (0, 0),
-                    (0, -1),
-                    "CENTER",
-                ),
-                (
-                    "ALIGN",
-                    (3, 1),
-                    (3, -1),
-                    "RIGHT",
-                ),
-                (
-                    "VALIGN",
-                    (0, 0),
-                    (-1, -1),
-                    "MIDDLE",
-                ),
-                (
-                    "LEFTPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    6,
-                ),
-                (
-                    "RIGHTPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    6,
-                ),
-                (
-                    "TOPPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    6,
-                ),
-                (
-                    "BOTTOMPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    6,
-                ),
-                (
-                    "BACKGROUND",
-                    (0, 0),
-                    (-1, -1),
-                    WHITE,
-                ),
-            ]
-        )
-    )
+    # Totals are separate from the selectable item columns. They must
+    # remain visible even when Price or every monetary column is hidden.
+    summary_rows = [
+        [Paragraph("<b>Subtotal</b>", body_right),
+         Paragraph("<b>" + plain_amount(abstract_total) + "</b>", body_right)]
+    ]
+    if data.gstEnabled:
+        summary_rows.append([
+            Paragraph(f"<b>GST {GLOBAL_GST_RATE:g}%</b>", body_right),
+            Paragraph("<b>" + plain_amount(abstract_gst) + "</b>", body_right),
+        ])
+    summary_rows.append([
+        Paragraph("<b>Grand Total</b>", body_right),
+        Paragraph("<b>" + plain_amount(abstract_total_including_gst) + "</b>", body_right),
+    ])
+    summary_table = Table(summary_rows, colWidths=[CONTENT_WIDTH - 35 * mm, 35 * mm])
+    summary_table.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.7, MID_GRAY),
+        ("INNERGRID", (0, 0), (-1, -1), 0.6, MID_GRAY),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
 
     story.append(
         abstract_table
     )
+    story.append(summary_table)
     story.append(
         Spacer(
             1,
@@ -3175,6 +3089,25 @@ def _build_detail_pages(
         in visible_columns
     ]
 
+    show_parts = next(
+        (column.visible for column in data.abstractColumns if column.id == "parts"),
+        True,
+    )
+    if show_parts:
+        detail_data = data
+    else:
+        # Collapse grouping in the PDF only. Do not alter saved product-part links.
+        merged_id = data.abstractItems[0].id if data.abstractItems else "__default_part__"
+        detail_data = data.model_copy(update={
+            "abstractItems": [
+                data.abstractItems[0].model_copy(update={"id": merged_id})
+            ] if data.abstractItems else [],
+            "products": [
+                product.model_copy(update={"abstractItemId": merged_id})
+                for product in data.products
+            ],
+        })
+
     _, natural_heights = (
         _measure_product_row_heights(
             data.products,
@@ -3254,7 +3187,7 @@ def _build_detail_pages(
 
     pages = (
         _grouped_detail_pages(
-            data,
+            detail_data,
             natural_heights,
             header_height,
             page_budget,
@@ -3275,11 +3208,11 @@ def _build_detail_pages(
         visible_columns
     )
 
-    if data.abstractItems:
+    if detail_data.abstractItems:
         part_ids = [
             item.id
             for item
-            in data.abstractItems
+            in detail_data.abstractItems
         ]
     else:
         part_ids = [
@@ -3469,18 +3402,10 @@ def _build_detail_pages(
                     )
                 ]
 
-            table_rows = [
-                part_row,
-                _header_row(
-                    visible_columns,
-                    body_center,
-                ),
-            ]
-
-            row_heights = [
-                None,
-                header_height,
-            ]
+            table_rows = (
+                [part_row] if show_parts else []
+            ) + [_header_row(visible_columns, body_center)]
+            row_heights = ([None] if show_parts else []) + [header_height]
 
             if segment[
                 "product_indices"
@@ -3494,7 +3419,7 @@ def _build_detail_pages(
                     ]
                 ):
                     product = (
-                        data.products[
+                        detail_data.products[
                             product_index
                         ]
                     )
@@ -3554,9 +3479,7 @@ def _build_detail_pages(
 
             subtotal_row_index = None
 
-            if segment[
-                "show_subtotal"
-            ]:
+            if show_parts and segment["show_subtotal"]:
                 subtotal_row_index = len(
                     table_rows
                 )
@@ -3618,7 +3541,7 @@ def _build_detail_pages(
                 colWidths=widths,
                 rowHeights=
                     row_heights,
-                repeatRows=2,
+                repeatRows=2 if show_parts else 1,
                 hAlign="LEFT",
                 splitByRow=1,
             )
@@ -3714,7 +3637,7 @@ def _build_detail_pages(
                 ),
             ]
 
-            if column_count > 2:
+            if show_parts and column_count > 2:
                 style_commands.extend(
                     [
                         (
@@ -3741,7 +3664,7 @@ def _build_detail_pages(
                         ),
                     ]
                 )
-            elif column_count > 1:
+            elif show_parts and column_count > 1:
                 style_commands.extend(
                     [
                         (
@@ -3759,7 +3682,7 @@ def _build_detail_pages(
                     ]
                 )
 
-            product_row_start = 2
+            product_row_start = 2 if show_parts else 1
             product_row_end = (
                 (
                     subtotal_row_index - 1
@@ -3876,11 +3799,24 @@ def _build_detail_pages(
                     ]
                 )
 
-            table.setStyle(
-                TableStyle(
-                    style_commands
-                )
-            )
+            if not show_parts:
+                # Remove part-title styling and shift row indices up one.
+                adjusted = []
+                for command in style_commands:
+                    if command[0] == "SPAN" and command[1][1] == 0:
+                        continue
+                    if command[0] == "ALIGN" and command[1][1] == 0 and command[2][1] == 0:
+                        continue
+                    # Keep whole-table rules unchanged; shift nonnegative row refs.
+                    def shift(cell):
+                        x, y = cell
+                        return (x, y - 1 if y > 0 else y)
+                    if len(command) >= 3 and isinstance(command[1], tuple) and isinstance(command[2], tuple):
+                        adjusted.append((command[0], shift(command[1]), shift(command[2]), *command[3:]))
+                    else:
+                        adjusted.append(command)
+                style_commands = adjusted
+            table.setStyle(TableStyle(style_commands))
 
             story.append(
                 table

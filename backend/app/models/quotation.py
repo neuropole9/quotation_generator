@@ -83,6 +83,7 @@ class ProjectDetails(BaseModel):
 class AbstractColumn(BaseModel):
     id: str
     label: str
+    visible: bool = True
 
 
 class QuotationAbstractLine(BaseModel):
