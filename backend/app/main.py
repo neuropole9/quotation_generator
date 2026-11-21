@@ -1,11 +1,9 @@
 
 import os
 
-import httpx
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.auth.clerk_auth import require_admin
 from app.db import Base, engine
 from app.models.saved_quotation import SavedQuotation  # noqa: F401
 from app.routes.health import router as health_router
@@ -100,7 +98,6 @@ app.include_router(
     prefix="/api",
 )
 
-
 @app.get("/")
 def root():
     return {
@@ -110,104 +107,6 @@ def root():
             "/docs",
     }
 
-
-# ---------------------------------------------------------
-# ODOO API INTEGRATION — READ-ONLY CONNECTION TEST
-# ---------------------------------------------------------
-
-@app.get("/api/integrations/odoo/check")
-async def check_odoo_connection(
-    _admin: dict = Depends(require_admin),
-):
-    """
-    Admin-only, read-only Odoo JSON-2 API connection test.
-
-    Verifies API access without creating or updating
-    customers, quotations, invoices, or other records.
-    """
-
-    base_url = os.getenv(
-        "ODOO_URL", ""
-    ).strip().rstrip("/")
-
-    api_key = os.getenv(
-        "ODOO_API_KEY", ""
-    ).strip()
-
-    database = os.getenv(
-        "ODOO_DATABASE", ""
-    ).strip()
-
-    if not base_url.startswith("https://") or not api_key:
-        raise HTTPException(
-            status_code=503,
-            detail="Odoo connection settings are missing or invalid.",
-        )
-
-    headers = {
-        "Authorization": f"bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-
-    if database:
-        headers["X-Odoo-Database"] = database
-
-    try:
-        async with httpx.AsyncClient(
-            timeout=15.0
-        ) as client:
-            response = await client.post(
-                f"{base_url}/json/2/res.partner/search_read",
-                headers=headers,
-                json={
-                    "domain": [],
-                    "fields": ["id"],
-                    "limit": 1,
-                },
-            )
-
-    except httpx.RequestError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail="Cannot connect to Odoo. Check Render logs and Odoo URL.",
-        ) from exc
-
-    if response.status_code in (401, 403):
-        raise HTTPException(
-            status_code=502,
-            detail="Odoo rejected the API key or account permissions.",
-        )
-
-    if response.status_code != 200:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Odoo API returned HTTP {response.status_code}.",
-        )
-
-    try:
-        payload = response.json()
-
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail="Odoo returned an invalid response.",
-        ) from exc
-
-    if not isinstance(payload, list):
-        raise HTTPException(
-            status_code=502,
-            detail="Unexpected Odoo API response format.",
-        )
-
-    return {
-        "connected": True,
-        "read_access": True,
-    }
-
-
-# ---------------------------------------------------------
-# EXISTING PDF IMPORT — UNCHANGED
-# ---------------------------------------------------------
 
 @app.post(
     "/api/quotation/import-pdf"
